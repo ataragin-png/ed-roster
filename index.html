@@ -221,7 +221,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <div class="wrap"><main id="main" style="padding:0"></main></div>
 <div id="layer"></div>
 <script>
-const API_DEFAULT='__API__';
+const API_DEFAULT='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 let API=API_DEFAULT.startsWith('http')?API_DEFAULT:'';
 try{const u=new URLSearchParams(location.search).get('api');if(u&&/^https:\/\/script\.google(usercontent)?\.com\//.test(u)){API=u;localStorage.setItem('ed-api',u)}else if(!API)API=localStorage.getItem('ed-api')||''}catch(e){}
 async function sendQ(q,msg,okText){
