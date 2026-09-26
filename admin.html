@@ -280,15 +280,15 @@ function defaultTypes(){
     T('g','בוקר צד ג','ג׳','day','08:00','16:00',['R'],none,'slate'),
     T('p','תורנות צד ג (פנימית)','פנ׳','duty','16:00','08:00',['A','R'],none,'rose'),
     T('c','מהלכים פנימית (פנימית ב)','מהל פנ','duty','16:00','08:00',['A','R'],none,'rose'),
-    T('mc','בוקר מהלכים כירורגיה','כיר ב','shift','09:00','21:00',['A','R'],none,'olive'),
-    T('nc','ערב מהלכים כירורגיה','כיר ע','shift','21:00','09:00',['A','R'],all,'olive'),
+    T('mc','בוקר מהלכים כירורגיה','כיר ב','shift','09:00','21:00',['A','R'],wkd,'olive'),
+    T('nc','ערב מהלכים כירורגיה','כיר ע','shift','21:00','09:00',['A','R'],wkd,'olive'),
     T('o','אורטופדיה','אורט','duty','16:00','08:00',['A','R'],none,'violet'),
     T('k','ילדים','ילד׳','duty','16:00','08:00',['A','R'],none,'violet'),
     T('i','טיפול נמרץ','טנ״צ','duty','16:00','08:00',['A','R'],none,'crimson'),
     T('a','מד״א','מד״א','shift','08:00','16:00',['A'],none,'slate'),
     T('z','בוקר אורתופדיה','או״ב','shift','08:00','16:00',['A'],none,'violet'),
     T('t','סטאז׳ר','סטאז','other','08:00','16:00',['A','R'],none,'slate')
-  ].map(t=>({...t,signer:['n','v','bv','p'].includes(t.code),loc:DEF_LOC[t.code]||'',extra:['i','k','o'].includes(t.code),internal:['p','c'].includes(t.code),restrict:t.code==='k',filler:['mc','z','a'].includes(t.code),sigReq:t.code==='nc'?[0,1,1,1,0,0,0]:null,forSigners:t.code==='c'}));
+  ].map(t=>({...t,signer:['n','v','bv','p'].includes(t.code),loc:DEF_LOC[t.code]||'',extra:['i','k','o'].includes(t.code),internal:['p','c'].includes(t.code),restrict:t.code==='k',filler:['z','a'].includes(t.code),late:t.code==='mc',sigReq:t.code==='nc'?[0,1,1,1,0,0,0]:null,forSigners:t.code==='c'}));
 }
 function uid(){return 'p'+Math.random().toString(36).slice(2,9)}
 function groupFromRot(rot){rot=(rot||'').trim(); if(/אגף\s*א/.test(rot)) return 'A'; if(/מילואים|חל״ד|חופשת לידה/.test(rot)) return 'X'; return 'R'}
@@ -301,7 +301,7 @@ function seedState(){
     roster[id]=blankRoster(g, g==='A'?'אגף א':r.rot, r.notes, i);
     for(const d in r.cells){cells[id+'|'+d]={c:r.cells[d].slice(),mk:''}}
   });
-  return {v:1,v3:1,v4:1,v5:1,v6:1,v7:1,sigInit:1,locInit:1,typesV2:1,cur:'2026-09',lastTab:'request',settings:{baseAS:11,baseAD:3,baseRD:6,minRest:12,maxCont:26,intMin:15,req:{...REQ_DEFAULT}},types:defaultTypes(),people,
+  return {v:1,v3:1,v4:1,v5:1,v6:1,v7:1,v8:1,sigInit:1,locInit:1,typesV2:1,cur:'2026-09',lastTab:'request',settings:{baseAS:11,baseAD:3,baseRD:6,minRest:12,maxCont:26,intMin:15,req:{...REQ_DEFAULT}},types:defaultTypes(),people,
     months:{'2026-09':{roster,cells,dayTypes:{11:'eve',12:'hol',13:'hol',20:'eve',21:'hol',25:'eve',26:'hol'},needOv:{}}}};
 }
 let S=null;
@@ -311,6 +311,7 @@ if(!S.settings.req)S.settings.req={...REQ_DEFAULT};
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v8){S.v8=1;S.v7=1;const wkd=[1,1,1,1,1,0,0];for(const t of S.types){if(t.code==='mc'){t.need=wkd.slice();t.filler=false;t.late=true}if(t.code==='nc')t.need=wkd.slice()}for(const k in S.months){const nv=S.months[k].needOv;for(const x in nv)if(/^(mc|nc)\|/.test(x))delete nv[x]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v7){S.v7=1;for(const t of S.types)if(t.code==='mc'){t.need=[0,0,0,0,0,0,0];t.filler=true}for(const k in S.months){const nv=S.months[k].needOv;for(const x in nv)if(/^mc\|/.test(x))delete nv[x]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v6){S.v6=1;for(const t of S.types)if(t.forSigners===undefined)t.forSigners=t.code==='c';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v5){S.v5=1;for(const t of S.types){if(t.code==='p'||t.code==='c')t.extra=false;if(t.code==='nc'&&!t.sigReq)t.sigReq=[0,1,1,1,0,0,0]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -499,7 +500,7 @@ function autofill(){
     const put=(pid,t,d)=>{commit(ctx,pid,t,d);picks.push({pid,d,code:t.code});has.add(t.code+'|'+d);if(t.signer&&sigs.has(pid))covered.add(d)};
     const covered=new Set(), remSig={};for(let d=1;d<=N;d++)if(!sigDay(d)||signersOn(d).length)covered.add(d);
     // שלב 1: משבצות חובה
-    const order=slots.map(s=>({...s,r:Math.random()})).sort((a,b)=>(sigReqOn(b.t,b.d)-sigReqOn(a.t,a.d))||((isWeekend(a.d)?0:1)-(isWeekend(b.d)?0:1))||(kindRank[a.t.kind]-kindRank[b.t.kind])||(a.r-b.r));
+    const order=slots.map(s=>({...s,r:Math.random()})).sort((a,b)=>((a.t.late?1:0)-(b.t.late?1:0))||(sigReqOn(b.t,b.d)-sigReqOn(a.t,a.d))||((isWeekend(a.d)?0:1)-(isWeekend(b.d)?0:1))||(kindRank[a.t.kind]-kindRank[b.t.kind])||(a.r-b.r));
     for(const s of order)if(s.t.signer)remSig[s.d]=(remSig[s.d]||0)+1;
     for(const s of order){
       const needSig=s.t.signer&&!covered.has(s.d);
@@ -681,7 +682,7 @@ function renderSettings(){
   <label>מנוחה מינימלית (שעות)<input type="number" data-s="minRest" value="${st.minRest}"></label>
   <label>רצף מקסימלי (שעות)<input type="number" data-s="maxCont" value="${st.maxCont}"></label>
   <label>מינימום תורנויות פנימית בחודש<input type="number" data-s="intMin" value="${st.intMin??15}"></label></div>
-  <p class="hint" style="margin-top:12px">סדר המילוי האוטומטי: קודם משבצות החובה בכל יום (אגף א, צד ב, מהלכים לילה ומה שמסומן בימים), אחר כך מכסת הפנימית (צד ג ומהלכים פנימית), אחר כך השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה או ילדים (רק למאושרים), ובסוף, למתמחי אגף א שעדיין חסרות להם משמרות (לא בגלל חופשה), בוקר מהלכים כירורגיה ואחריו בוקר אורתופדיה או מד״א בימי חול.</p></div>`;
+  <p class="hint" style="margin-top:12px">סדר המילוי האוטומטי: קודם משבצות החובה בכל יום (אגף א, צד ב, מהלכים לילה ומה שמסומן בימים), אחר כך מכסת הפנימית (צד ג ומהלכים פנימית), אחר כך השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה או ילדים (רק למאושרים), ובסוף, למתמחי אגף א שעדיין חסרות להם משמרות (לא בגלל חופשה), בוקר אורתופדיה או מד״א בימי חול. בוקר מהלכים כירורגיה הוא משבצת חובה בראשון עד חמישי, אבל מאויש אחרון מבין משבצות החובה, כך שאם חסרים אנשים, החוסר נופל עליו ולא על אגף א.</p></div>`;
   h+=`<div class="panel"><h2>סוגי משמרות</h2><p class="hint">הקודים זהים לקודים בגיליון הבקשות. בכל מקום יכול לעבוד רק אדם אחד בכל רגע, לכן משמרות שחופפות בזמן ובמקום לא ישובצו לשני אנשים. מתמחה ברוטציה שעושה בוקר וערב מהלכים כירורגיה באותו יום (24 שעות) נספר כתורנות אחת. סמנו לאיזו קבוצה כל משמרת מתאימה, באילו משמרות חותם שחרור מכסה את הלילה, ובאילו ימים היא נדרשת (ערב חג נחשב כשישי, חג נחשב כשבת). אפשר גם להדליק או לכבות דרישה ליום בודד מלחיצה על שורת הכיסוי בלוח.</p><div class="tablewrap"><table class="form"><thead><tr><th>קוד</th><th>שם</th><th>קיצור</th><th title="בכל מקום יכול להיות רק אדם אחד בכל רגע. ריק = ללא הגבלה">מקום</th><th>סוג</th><th>משעה</th><th>עד</th><th>אגף א</th><th>סבב</th><th title="חותם שחרור במשמרת הזו מכסה את הלילה">חותם בלילה</th><th title="נספר במכסת הפנימית החודשית">פנימית</th><th title="בפנימית: חותם שחרור ישובץ עדיף כאן">פנימית לחותמים</th><th title="משלים משמרות למתמחי אגף א שלא הגיעו למכסה">משלים לאגף א</th><th title="משובץ בשלב ההשלמה, אחרי החובה והפנימית">השלמה</th><th title="רק מתמחים מאושרים יכולים להיות משובצים">דורש אישור</th><th>נדרש בימים</th><th title="בימים המסומנים רק חותם שחרור יכול לקבל את המשמרת">חותם חובה בימים</th><th>צבע</th><th></th></tr></thead><tbody>`;
   S.types.forEach((t,i)=>{
     h+=`<tr data-ti="${i}"><td><input type="text" class="w-short" data-tf="code" value="${esc(t.code)}" dir="ltr"></td>
