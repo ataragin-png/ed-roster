@@ -1329,10 +1329,28 @@ $('#bAuto').onclick=()=>{const b=$('#bAuto');b.disabled=true;b.textContent='מח
 $('#bUndo').onclick=undo;
 $('#bNew').onclick=newMonthSheet;
 $('#bImport').onclick=()=>$('#fileIn').click();
+function mergeBackup(x){
+  const idMap={},added=[],skipped=[];
+  for(const bp of x.people||[]){let p=findPerson(bp.name);if(!p){p={...bp,id:uid()};S.people.push(p)}idMap[bp.id]=p.id}
+  for(const key of Object.keys(x.months).sort()){
+    if(S.months[key]){skipped.push(key);continue}
+    const mo=x.months[key],roster={},cells={};
+    for(const id in mo.roster)if(idMap[id])roster[idMap[id]]=mo.roster[id];
+    for(const k in mo.cells){const[id,d]=k.split('|');if(idMap[id])cells[idMap[id]+'|'+d]=mo.cells[k]}
+    S.months[key]={...mo,roster,cells};added.push(key)}
+  return{added,skipped};
+}
 document.addEventListener('change',e=>{if(e.target.id!=='restoreIn')return;const f=e.target.files[0];e.target.value='';if(!f)return;const fr=new FileReader();
   fr.onload=()=>{try{const x=JSON.parse(fr.result);if(!x||x.v!==1||!x.months||!x.types)throw new Error('זה לא קובץ גיבוי של האתר');
-    if(!confirm('הגיבוי יחליף את כל הנתונים באתר הזה. להמשיך?'))return;S=x;if(!Array.isArray(S.pending))S.pending=[];if(!S.settings.req)S.settings.req={...REQ_DEFAULT};if(!S.months[S.cur])S.cur=Object.keys(S.months).sort().pop();undoStack=[];save();location.reload()}
-    catch(err){toast('הטעינה נכשלה: '+err.message,4500)}};fr.readAsText(f)});
+    const keys=Object.keys(x.months).sort(),newKeys=keys.filter(k=>!S.months[k]);
+    const sh=openSheet(`<h3>טעינת גיבוי</h3><p class="sub">בגיבוי יש: ${keys.map(kLabel).join(', ')}.</p>
+      <div class="rules"><strong>הוסף חודשים חדשים</strong>מוסיף רק חודשים שאין באתר${newKeys.length?` (${newKeys.map(kLabel).join(', ')})`:''}. החודשים, ההגדרות והמתמחים הקיימים לא משתנים.</div>
+      <div class="rules"><strong>החלף הכול</strong>מוחק את כל מה שבאתר ושם במקומו את הגיבוי, כולל ההגדרות.</div>
+      <div class="foot"><button class="btn primary" id="rsAdd" ${newKeys.length?'':'disabled'}>הוסף חודשים חדשים</button><button class="btn danger" id="rsAll">החלף הכול</button><button class="btn" data-close>ביטול</button></div>`);
+    sh.el.querySelector('#rsAdd').onclick=()=>{const r=mergeBackup(x);if(r.added.length)S.cur=r.added[r.added.length-1];undoStack=[];save();sh.close();render();toast(`נוספו: ${r.added.map(kLabel).join(', ')}${r.skipped.length?`. לא שונו: ${r.skipped.map(kLabel).join(', ')}`:''}`,5000)};
+    sh.el.querySelector('#rsAll').onclick=()=>{if(!confirm('למחוק את כל הנתונים באתר ולהחליף בגיבוי?'))return;const keepApi={apiUrl:S.settings.apiUrl,apiKey:S.settings.apiKey};S=x;if(!Array.isArray(S.pending))S.pending=[];if(!S.settings.req)S.settings.req={...REQ_DEFAULT};if(!S.settings.apiUrl&&keepApi.apiUrl)S.settings.apiUrl=keepApi.apiUrl;if(!S.settings.apiKey&&keepApi.apiKey)S.settings.apiKey=keepApi.apiKey;if(!S.months[S.cur])S.cur=Object.keys(S.months).sort().pop();undoStack=[];save();location.reload()};
+  }catch(err){toast('הטעינה נכשלה: '+err.message,4500)}};fr.readAsText(f)});
+
 $('#fileIn').onchange=e=>{const f=e.target.files[0];if(f)importXlsx(f);e.target.value=''};
 $('#bExport').onclick=exportXlsx;
 $('#bClear').onclick=()=>{if(!confirm('למחוק את כל השיבוצים בחודש הזה? סימוני חופש ואילוץ יישארו.'))return;pushUndo();for(const k in M().cells){const cl=M().cells[k];cl.c=[];if(!cl.mk)delete M().cells[k]}save();render();toast('השיבוצים נמחקו. אפשר לבטל')};
