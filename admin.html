@@ -351,12 +351,17 @@ function qualified(pid,t){return!t.restrict||!!(person(pid)?.quals||{})[t.code]}
 function internalCount(){let n=0;for(let d=1;d<=dim();d++)for(const t of S.types)if(t.internal)n+=filled(t.code,d).length;return n}
 function homeOf(pid){const r=M().roster[pid];if(!r||r.group!=='R')return'';if(r.home!==undefined)return r.home;return/ב\s*\+\s*ג|צד\s*ב|כירורגיה/.test(r.rot||'')?'b':''}
 function sigReqOn(t,d){return!!(t.sigReq&&t.sigReq[wd(d)])}
+const PARTS={'':'כל היום',day:'יום (09–21)',night:'לילה (21–09)'};
+function blockWin(d,part){const b=(d-1)*1440;return part==='day'?{s:b+540,e:b+1260}:{s:b+1260,e:b+1980}}
+function blockHit(pid,x,d0){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='off')continue;
+  if(!cl.part){if(dd===d0)return'יום שלם';continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
+function blockUnits(pid,g){const u=[];for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);if(cl.mk!=='off')continue;u.push(d);if(g==='A'&&!cl.part)u.push(d)}return u}
 function isICU(pid){const r=M().roster[pid];return!!r&&r.group==='R'&&/ICU|טנ.?צ|טיפול\s*נמרץ/i.test(r.rot||'')}
 function wkndMorning(t,d){return t.code==='b'&&isWeekend(d)}
 function person(id){return S.people.find(p=>p.id===id)}
 function pname(id){return person(id)?.name||'?'}
 function cellOf(pid,d){return M().cells[pid+'|'+d]||{c:[],mk:''}}
-function setCell(pid,d,cell){const k=pid+'|'+d,old=M().cells[k],mk=cell.mk||'';let wc=cell.wc!==undefined?cell.wc:(old&&old.wc);if(mk!=='want')wc='';if(!cell.c.length&&!mk)delete M().cells[k];else{M().cells[k]={c:cell.c.slice(),mk};if(wc)M().cells[k].wc=wc}}
+function setCell(pid,d,cell){const k=pid+'|'+d,old=M().cells[k],mk=cell.mk||'';let wc=cell.wc!==undefined?cell.wc:(old&&old.wc);if(mk!=='want')wc='';let part=cell.part!==undefined?cell.part:(old&&old.part);if(mk!=='off')part='';if(!cell.c.length&&!mk)delete M().cells[k];else{M().cells[k]={c:cell.c.slice(),mk};if(wc)M().cells[k].wc=wc;if(part)M().cells[k].part=part}}
 function rosterIds(){const R=M().roster;const go={A:0,R:1,X:2};return Object.keys(R).filter(id=>person(id)).sort((a,b)=>(go[R[a].group]-go[R[b].group])||(R[a].order-R[b].order))}
 function need(code,d){const ov=M().needOv[code+'|'+d];if(ov!==undefined)return ov;const t=typeBy(code);if(!t)return 0;const dt=dtype(d);const idx=dt==='hol'?6:dt==='eve'?5:wd(d);return t.need[idx]?1:0}
 function filled(code,d){return rosterIds().filter(id=>cellOf(id,d).c.includes(code))}
@@ -392,7 +397,8 @@ function analyze(){
         else if(!t.groups.includes(r.group))add(pid,d,'warn',`${t.name} לא מיועד ל${GROUPS[r.group]}`);
       }
       if(r.group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
-      if(cl.c.length&&(cl.mk==='vac'||cl.mk==='off'))add(pid,d,'err',cl.mk==='vac'?'שובץ ביום חופש':'שובץ ביום שחסם');
+      if(cl.c.length&&cl.mk==='vac')add(pid,d,'err','שובץ ביום חופש');
+      for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d);if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
       if(cl.c.length&&cl.mk==='soft')add(pid,d,'warn','שובץ ביום שביקש שלא');
       if(cl.mk==='want'&&cl.wc&&cl.c.length&&!cl.c.includes(cl.wc))add(pid,d,'warn',`ביקש ${typeBy(cl.wc)?.name||cl.wc}`);
     }
@@ -436,7 +442,8 @@ function evaluate(pid,t,d,ctx){
   if(r.group==='X'){hard=true;why.push('לא זמין החודש')}
   if(!t.groups.includes(r.group)){hard=true;why.push('לא מתאים לקבוצה')}
   const cl0=cellOf(pid,d),mk=cl0.mk;
-  if(mk==='vac'){hard=true;why.push('חופש')} if(mk==='off'){hard=true;why.push('אילוץ')}
+  if(mk==='vac'){hard=true;why.push('חופש')}
+  {const bh=blockHit(pid,iv(t.code,d),d);if(bh){hard=true;why.push(`חסום: ${bh}`)}}
   if(ctx.days[pid].has(d)){hard=true;why.push('כבר משובץ ביום זה')}
   if(t.loc){const x0=iv(t.code,d);const o=(ctx.occ[t.loc]||[]).find(y=>y.pid!==pid&&x0.s<y.e&&y.s<x0.e);if(o){hard=true;why.push(`${t.loc} תפוס (${pname(o.pid)})`)}}
   const x=iv(t.code,d);
@@ -593,8 +600,9 @@ function renderGrid(){
     for(let d=1;d<=N;d++){
       const cl=cellOf(pid,d), is=A.issues[pid+'|'+d];
       const cls=[dayClass(d),cl.mk?'mk-'+cl.mk:'',is?is.lvl:'','cellwrap'].join(' ');
-      const chips=cl.c.map(c=>{const t=typeBy(c);return t?`<span class="chip c-${t.color}">${esc(t.short)}</span>`:`<span class="chip c-slate">${esc(c)}</span>`}).join('');
-      const tip=[pname(pid)+', '+fmtDate(d),...cl.c.map(c=>typeBy(c)?.name||c),cl.mk?MARKS[cl.mk]+(cl.wc?': '+(typeBy(cl.wc)?.name||cl.wc):''):'',...(is?is.msgs:[])].filter(Boolean).join('\n');
+      const ptag=cl.mk==='off'&&cl.part?`<span style="position:absolute;bottom:1px;right:3px;font-size:9.5px;font-weight:700;color:var(--muted)">${cl.part==='day'?'י':'ל'}</span>`:'';
+      const chips=ptag+cl.c.map(c=>{const t=typeBy(c);return t?`<span class="chip c-${t.color}">${esc(t.short)}</span>`:`<span class="chip c-slate">${esc(c)}</span>`}).join('');
+      const tip=[pname(pid)+', '+fmtDate(d),...cl.c.map(c=>typeBy(c)?.name||c),cl.mk?MARKS[cl.mk]+(cl.wc?': '+(typeBy(cl.wc)?.name||cl.wc):'')+(cl.mk==='off'&&cl.part?': '+PARTS[cl.part]:''):'',...(is?is.msgs:[])].filter(Boolean).join('\n');
       h+=`<td class="${cls}"><button class="cell" data-p="${pid}" data-d="${d}" title="${esc(tip)}" aria-label="${esc(tip)}">${chips}</button></td>`;
     }
     h+=`</tr>`;
@@ -726,6 +734,7 @@ function cellSheet(pid,d){
     h+=`<h4>שיבוץ</h4><div class="opts">${elig.map(optBtn).join('')}</div>`;
     if(other.length)h+=`<details style="margin-top:8px"><summary style="color:var(--muted);font-size:13px;cursor:pointer">משמרות של קבוצה אחרת</summary><div class="opts" style="margin-top:6px">${other.map(optBtn).join('')}</div></details>`;
     h+=`<h4>סימון</h4><div class="opts">${Object.entries(MARKS).map(([k,v])=>`<button class="opt" data-mk="${k}" aria-pressed="${(cl.mk||'')===k}">${v}</button>`).join('')}</div>`;
+    if(cl.mk==='off'&&r.group==='A')h+=`<h4>מה חסום</h4><div class="opts">${Object.entries(PARTS).map(([k,v])=>`<button class="opt" data-part="${k}" aria-pressed="${(cl.part||'')===k}">${v}</button>`).join('')}</div>`;
     if(cl.mk==='want')h+=`<h4>איזו משמרת ביקש</h4><div class="opts"><button class="opt" data-wc="" aria-pressed="${!cl.wc}">כל משמרת</button>${elig.map(t=>`<button class="opt" data-wc="${t.code}" aria-pressed="${cl.wc===t.code}"><span class="chip c-${t.color}">${esc(t.short)}</span>${esc(t.name)}</button>`).join('')}</div>`;
     if(is)h+=`<ul class="issues">${is.msgs.map(m=>`<li class="${is.lvl}">${esc(m)}</li>`).join('')}</ul>`;
     if(r.notes)h+=`<h4>בקשות המתמחה</h4><div class="note">${esc(r.notes)}</div>`;
@@ -738,6 +747,7 @@ function cellSheet(pid,d){
     const cl=cellOf(pid,d);
     if(b.dataset.code){pushUndo();const c=b.dataset.code;const arr=cl.c.includes(c)?cl.c.filter(x=>x!==c):[...cl.c,c];setCell(pid,d,{c:arr,mk:cl.mk})}
     else if(b.dataset.mk!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:b.dataset.mk})}
+    else if(b.dataset.part!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:'off',part:b.dataset.part})}
     else if(b.dataset.wc!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:'want',wc:b.dataset.wc})}
     else if(b.hasAttribute('data-clearcell')){pushUndo();setCell(pid,d,{c:[],mk:''})}
     else return;
@@ -794,7 +804,7 @@ function exportXlsx(){
   const r2=[y];for(let d=1;d<=N;d++)r2.push(WD[wd(d)]);
   const req=[r1,r2];
   for(const pid of ids){const r=M().roster[pid],P=A.per[pid];const row=[pname(pid)];
-    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);row.push([...cl.c,cl.mk==='vac'?'חופש':cl.mk==='off'?'חסימה':cl.mk==='soft'?'שלא':cl.mk==='want'?('רוצה'+(cl.wc?':'+cl.wc:'')):''].filter(Boolean).join(' '))}
+    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);row.push([...cl.c,cl.mk==='vac'?'חופש':cl.mk==='off'?(cl.part==='day'?'חסימה-יום':cl.part==='night'?'חסימה-לילה':'חסימה'):cl.mk==='soft'?'שלא':cl.mk==='want'?('רוצה'+(cl.wc?':'+cl.wc:'')):''].filter(Boolean).join(' '))}
     row.push(r.group==='A'?'אגף א':r.group==='X'?(r.rot||'לא זמין'):r.rot,r.notes,P.cnt.shift,P.cnt.duty,P.cnt.wk.size,...codes.map(c=>{let n=0;for(let d=1;d<=N;d++)if(cellOf(pid,d).c.includes(c))n++;return n}));
     req.push(row)}
   const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
@@ -838,7 +848,7 @@ function importXlsx(file){
         for(let d=1;d<=nd;d++){
           const v=String(aoa[r][c1+d-1]||'').trim(); if(!v)continue;
           const k=p.id+'|'+d; const cl=cells[k]||{c:[],mk:''};
-          for(const tok of v.split(/[\s+,]+/)){if(!tok)continue;let wm;if(tok==='mn'&&codeSet.has('m')&&codeSet.has('n')){for(const x of['m','n'])if(!cl.c.includes(x))cl.c.push(x)}else if(codeSet.has(tok)){if(!cl.c.includes(tok))cl.c.push(tok)}else if(/חופש/.test(tok))cl.mk='vac';else if(/אילוץ|חסימה/.test(tok))cl.mk='off';else if(/^שלא$/.test(tok))cl.mk='soft';else if((wm=tok.match(/^רוצה(?::(\w+))?$/))){cl.mk='want';if(wm[1])cl.wc=wm[1]}else unknown.add(tok)}
+          for(const tok of v.split(/[\s+,]+/)){if(!tok)continue;let wm;if(tok==='mn'&&codeSet.has('m')&&codeSet.has('n')){for(const x of['m','n'])if(!cl.c.includes(x))cl.c.push(x)}else if(codeSet.has(tok)){if(!cl.c.includes(tok))cl.c.push(tok)}else if(/חופש/.test(tok))cl.mk='vac';else if(/אילוץ|חסימה/.test(tok)){cl.mk='off';if(/יום/.test(tok))cl.part='day';else if(/לילה/.test(tok))cl.part='night'}else if(/^שלא$/.test(tok))cl.mk='soft';else if((wm=tok.match(/^רוצה(?::(\w+))?$/))){cl.mk='want';if(wm[1])cl.wc=wm[1]}else unknown.add(tok)}
           if(cl.c.length||cl.mk)cells[k]=cl;
         }
       }
@@ -912,17 +922,17 @@ function loadRQ(keep){
   const mo=S.months[RQ.m], p=findPerson(RQ.name);
   const clear=()=>{RQ.b=new Set();RQ.s=new Set();RQ.w=new Map()};
   if(!mo||!p||!mo.roster[p.id]){if(!keep)clear();return}
-  const r=mo.roster[p.id], b=new Set(), s=new Set(), w=new Map();
+  const r=mo.roster[p.id], bp=new Map(), b=new Set(), s=new Set(), w=new Map();
   if(r.group==='A'||r.group==='R'){RQ.g=r.group;RQ.rot=r.group==='R'?r.rot:''}
   for(let d=1;d<=kDim(RQ.m);d++){const cl=mo.cells[p.id+'|'+d];if(!cl)continue;
-    if(cl.mk==='off')b.add(d);else if(cl.mk==='soft')s.add(d);else if(cl.mk==='want')w.set(d,cl.wc||'')}
+    if(cl.mk==='off'){b.add(d);if(cl.part)bp.set(d,cl.part)}else if(cl.mk==='soft')s.add(d);else if(cl.mk==='want')w.set(d,cl.wc||'')}
   if(keep&&!b.size&&!s.size&&!w.size&&!r.reqAt)return;
-  RQ.b=b;RQ.s=s;RQ.w=w;RQ.t=r.notes||'';
+  RQ.b=b;RQ.bp=bp;RQ.s=s;RQ.w=w;RQ.t=r.notes||'';
 }
 function rulesBox(g,key){
   const r=S.settings.req;
   return`<div class="rules"><strong>כללי הגשת בקשות${key?' ל'+kLabel(key):''}</strong><ul>
-  <li>אגף א (פיילוט): אפשר לחסום עד ${r.A} תאריכים, מתוכם עד ${r.wkA} בסופ״ש או בחג.</li>
+  <li>אגף א (פיילוט): אפשר לחסום עד ${r.A} משמרות (יום 09–21 או לילה 21–09; יום שלם נספר כשתיים), מתוכם עד ${r.wkA} בסופ״ש או בחג.</li>
   <li>רוטציה: אפשר לחסום עד ${r.R} תאריכים לתורנויות, מתוכם עד ${r.wkR} בסופ״ש או בחג.</li>
   <li>לא כל החסימות יכולות להיות בסופ״ש.</li>
   <li>אפשר לבקש משמרות מסוימות שרוצים לעשות.</li>
@@ -931,7 +941,7 @@ function rulesBox(g,key){
 }
 function renderRequest(){
   if(!RQ)RQ=newRQ();
-  const key=RQ.m, N=kDim(key), chk=checkBlocks(key,RQ.g,[...RQ.b]);
+  const key=RQ.m, N=kDim(key), chk=checkBlocks(key,RQ.g,rqUnits());
   const names=[...new Set(S.people.map(p=>norm(p.name)))].sort((a,b)=>a.localeCompare(b,'he'));
   const wt=wantTypes(RQ.g);
   let h=`<div class="panel req"><h2>הגשת בקשות למשמרות</h2><p class="hint">בחרו את החודש ואת השם, סמנו את הימים בלוח ושלחו את ההודעה שנוצרת לרכז/ת השיבוץ.</p>${rulesBox(RQ.g,key)}
@@ -963,7 +973,8 @@ function renderRequest(){
 }
 function b64e(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))))}
 function b64d(s){return JSON.parse(decodeURIComponent(escape(atob(s))))}
-function buildReq(){return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),b:[...RQ.b].sort((a,b)=>a-b),s:[...RQ.s].sort((a,b)=>a-b),w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
+function rqUnits(){return[...RQ.b].flatMap(d=>RQ.g==='A'&&!(RQ.bp&&RQ.bp.get(d))?[d,d]:[d])}
+function buildReq(){const bp=[...RQ.b].filter(d=>RQ.bp&&RQ.bp.get(d)).map(d=>[d,RQ.bp.get(d)]);return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),bp,bu:[...RQ.b].flatMap(d=>RQ.g==='A'&&!(RQ.bp&&RQ.bp.get(d))?[d,d]:[d]),b:[...RQ.b].sort((a,b)=>a-b),s:[...RQ.s].sort((a,b)=>a-b),w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
 function reqMessage(q){
   const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.b.length}): ${q.b.join(', ')||'אין'}`];
   if(q.s.length)L.push(`מעדיף שלא: ${q.s.join(', ')}`);
@@ -974,7 +985,7 @@ function reqMessage(q){
 }
 function validRQ(){
   if(!norm(RQ.name)){toast('כתבו את השם שלכם');$('#rqName')&&$('#rqName').focus();return false}
-  const chk=checkBlocks(RQ.m,RQ.g,[...RQ.b]);
+  const chk=checkBlocks(RQ.m,RQ.g,rqUnits());
   if(chk.errs.length){toast('יש לתקן: '+chk.errs.join(', '),4000);return false}
   return true;
 }
@@ -988,8 +999,9 @@ function applyRequest(q){
   const N=kDim(q.m);
   const clr=Array.isArray(q.vac)?['off','soft','want','vac']:['off','soft','want'];if(Array.isArray(q.vac))r.vacBy=q.vby||'';
   for(let d=1;d<=N;d++){const k=p.id+'|'+d,cl=mo.cells[k];if(cl&&clr.includes(cl.mk)){cl.mk='';delete cl.wc;if(!cl.c.length)delete mo.cells[k]}}
-  const put=(d,mk,wc)=>{d=Number(d);if(!(d>=1&&d<=N))return;const k=p.id+'|'+d,cl=mo.cells[k]||{c:[],mk:''};cl.mk=mk;if(wc)cl.wc=wc;else delete cl.wc;mo.cells[k]=cl};
-  (q.vac||[]).forEach(d=>put(d,'vac'));(q.b||[]).forEach(d=>put(d,'off'));(q.s||[]).forEach(d=>put(d,'soft'));(q.w||[]).forEach(([d,c])=>put(d,'want',c));
+  const put=(d,mk,wc,part)=>{d=Number(d);if(!(d>=1&&d<=N))return;const k=p.id+'|'+d,cl=mo.cells[k]||{c:[],mk:''};cl.mk=mk;if(wc)cl.wc=wc;else delete cl.wc;if(part)cl.part=part;else delete cl.part;mo.cells[k]=cl};
+  const bpm=new Map(q.bp||[]);
+  (q.vac||[]).forEach(d=>put(d,'vac'));(q.b||[]).forEach(d=>put(d,'off','',q.g==='A'?bpm.get(d):''));(q.s||[]).forEach(d=>put(d,'soft'));(q.w||[]).forEach(([d,c])=>put(d,'want',c));
   return{p,isNew,mismatch:(r.group==='A'||r.group==='R')&&r.group!==q.g};
 }
 function sendSheet(){
@@ -1010,8 +1022,8 @@ function renderInbox(){
   let sub=0;
   const rows=ids.map(pid=>{
     const r=M().roster[pid]; const b=[],s=[],w=[];
-    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);if(cl.mk==='off')b.push(d);else if(cl.mk==='soft')s.push(d);else if(cl.mk==='want')w.push(d)}
-    const chk=checkBlocks(S.cur,r.group==='R'?'R':'A',b); if(r.reqAt)sub++;
+    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);if(cl.mk==='off')b.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='soft')s.push(d);else if(cl.mk==='want')w.push(d)}
+    const chk=checkBlocks(S.cur,r.group==='R'?'R':'A',blockUnits(pid,r.group==='R'?'R':'A')); if(r.reqAt)sub++;
     return{pid,r,b,s,w,chk};
   });
   let h=`<div class="panel"><h2>קליטת הודעות</h2><p class="hint">הדביקו כאן הודעות מוואטסאפ, אפשר כמה יחד. בקשות לבניית הלוח נכנסות ישר ללוח. אחרי שהלוח אושר סופית, כל בקשה חדשה וכל החלפה ממתינות לאישור שלך.</p>
@@ -1027,7 +1039,7 @@ function renderInbox(){
     h+=`<tr><td><strong>${esc(pname(x.pid))}</strong></td><td>${x.r.group==='A'?'אגף א':'רוטציה'}${x.r.reqG&&x.r.reqG!==x.r.group?`<div class="errs" style="font-size:12px">הגיש כ${x.r.reqG==='A'?'אגף א':'רוטציה'}</div>`:''}</td>
     <td class="${x.r.reqAt?'okc':''}">${x.r.reqAt?new Date(x.r.reqAt).toLocaleDateString('he-IL'):'עוד לא'}</td>
     <td class="num" title="${esc(x.r.vacBy?'אישר: '+x.r.vacBy:'')}">${vacDays(x.pid)||''}${x.r.vacBy?`<div style="font-size:11px;color:var(--muted)">${esc(x.r.vacBy)}</div>`:''}</td>
-    <td class="num ${x.b.length>ru.max||x.chk.errs.length?'bad':''}" title="${esc(x.b.join(', '))}">${x.b.length}/${ru.max}</td>
+    <td class="num ${x.chk.errs.length?'bad':''}" title="${esc(x.b.join(', '))}">${blockUnits(x.pid,x.r.group==='R'?'R':'A').length}/${ru.max}</td>
     <td class="num ${x.chk.wk>ru.wk?'bad':''}">${x.chk.wk}/${ru.wk}</td>
     <td class="num" title="${esc(x.s.join(', '))}">${x.s.length}</td><td class="num" title="${esc(x.w.join(', '))}">${x.w.length}</td>
     <td style="max-width:260px;white-space:normal">${esc(x.r.notes)}</td>
@@ -1057,13 +1069,13 @@ function ingest(txt){
   if(!queued.length&&months.length===1&&months[0]!==S.cur){S.cur=months[0];undoStack=[];$('#bUndo').disabled=true;save()}
   render();
   let html=`<h3>נקלטו ${applied.length+queued.length} הודעות</h3>`;
-  if(applied.length)html+=`<h4>נכנסו ישר ללוח</h4><ul class="issues" style="padding-right:18px">${applied.map(x=>{const c=checkBlocks(x.q.m,x.q.g,x.q.b);return`<li class="${c.errs.length?'err':''}">${esc(x.p.name)} (${kLabel(x.q.m)}): ${x.q.b.length} חסימות${x.q.vac&&x.q.vac.length?`, <b>${x.q.vac.length} ימי חופשה מאושרת (אישר: ${esc(x.q.vby||'לא צוין')})</b>`:''}${x.isNew?', מתמחה חדש נוסף לרשימה':''}${x.mismatch?', הגיש בקבוצה אחרת מזו שבלוח':''}${c.errs.length?', '+esc(c.errs.join(', ')):''}</li>`}).join('')}</ul>`;
+  if(applied.length)html+=`<h4>נכנסו ישר ללוח</h4><ul class="issues" style="padding-right:18px">${applied.map(x=>{const c=checkBlocks(x.q.m,x.q.g,x.q.bu||x.q.b);return`<li class="${c.errs.length?'err':''}">${esc(x.p.name)} (${kLabel(x.q.m)}): ${x.q.b.length} חסימות${x.q.vac&&x.q.vac.length?`, <b>${x.q.vac.length} ימי חופשה מאושרת (אישר: ${esc(x.q.vby||'לא צוין')})</b>`:''}${x.isNew?', מתמחה חדש נוסף לרשימה':''}${x.mismatch?', הגיש בקבוצה אחרת מזו שבלוח':''}${c.errs.length?', '+esc(c.errs.join(', ')):''}</li>`}).join('')}</ul>`;
   if(queued.length)html+=`<h4>ממתינים לאישור שלך</h4><ul class="issues" style="padding-right:18px">${queued.map(q=>`<li>${esc(q.n)}: ${q.type==='chg'?(q.kind==='swap'?'בקשת החלפה':'בקשה למסור משמרת'):'בקשה ללוח שכבר נסגר'}</li>`).join('')}</ul>`;
   if(bad)html+=`<p class="errs">${bad} קודים פגומים לא נקלטו</p>`;
   openSheet(html+`<div class="foot"><button class="btn primary" data-close>סגור</button></div>`);
 }
 function pendingCard(q,i){
-  const p=findPerson(q.n),mo=S.months[q.m],r=p&&mo&&mo.roster[p.id],chk=checkBlocks(q.m,q.g,q.b);
+  const p=findPerson(q.n),mo=S.months[q.m],r=p&&mo&&mo.roster[p.id],chk=checkBlocks(q.m,q.g,q.bu||q.b);
   const dl=arr=>arr.map(d=>`${d} (${WD[kWd(q.m,d)]})`).join(', ');
   const notes=['הלוח לחודש הזה כבר אושר סופית. אישור יוסיף את הסימונים בלי לשנות שיבוצים קיימים'];
   if(!p)notes.push('מתמחה חדש, ייווסף לרשימה');
@@ -1071,7 +1083,7 @@ function pendingCard(q,i){
   if(r&&r.reqAt)notes.push('יחליף בקשה קודמת');
   return`<div class="panel" style="margin-bottom:10px;padding:12px 14px"><div class="row" style="justify-content:space-between"><div><strong style="font-size:15px">${esc(q.n)}</strong> <span style="color:var(--muted);font-size:13px">בקשות ל${kLabel(q.m)}, ${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+esc(q.r):'')}, נשלח ${q.ts?new Date(q.ts).toLocaleDateString('he-IL'):''}</span></div>
   <div class="row"><button class="btn small primary" data-approve="${i}">אשר</button><button class="btn small danger" data-reject="${i}">דחה</button></div></div>
-  <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${q.b.length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(dl(q.b))||'אין'}</div>
+  <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p[1]==='day'?'יום':'לילה'):''})`}).join(', '))||'אין'}</div>
   ${q.vac&&q.vac.length?`<div><b>חופשה מאושרת (אישר: ${esc(q.vby||'לא צוין')}):</b> ${esc(dl(q.vac))}</div>`:''}
   ${q.s.length?`<div><b>מעדיף שלא:</b> ${esc(dl(q.s))}</div>`:''}
   ${q.w.length?`<div><b>רוצה לעבוד:</b> ${esc(q.w.map(([d,c])=>c?`${d} (${typeBy(c)?.name||c})`:String(d)).join(', '))}</div>`:''}
@@ -1144,7 +1156,7 @@ function formUrl(){return(S.settings.formUrl||'').trim()||APP_URL}
 function remindSheet(){
   const key=monthOpts().includes(defaultReqMonth())&&defaultReqMonth()>S.cur?defaultReqMonth():S.cur;
   const draw=k=>{const r=S.settings.req;return[`בקשות משמרות ל${kLabel(k)}`,r.deadline?`יש להגיש עד ${r.deadline}.`:'','','כללים:',
-    `• אגף א (פיילוט): אפשר לחסום עד ${r.A} תאריכים, מתוכם עד ${r.wkA} בסופ״ש או בחג.`,
+    `• אגף א (פיילוט): אפשר לחסום עד ${r.A} משמרות: יום (09–21) או לילה (21–09). חסימת יום שלם נספרת כשתי משמרות. עד ${r.wkA} מהן בסופ״ש או בחג.`,
     `• רוטציה: אפשר לחסום עד ${r.R} תאריכים לתורנויות, מתוכם עד ${r.wkR} בסופ״ש או בחג.`,
     '• לא כל החסימות יכולות להיות בסופ״ש.','• אפשר לבקש משמרות מסוימות שרוצים לעשות.',
     '• מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות.','',
@@ -1164,7 +1176,7 @@ $('#main').addEventListener('click',e=>{
     if(RQ.mode==='b'){
       if(RQ.b.has(d))RQ.b.delete(d);
       else{const ru=rulesFor(RQ.g), wk=[...RQ.b].filter(x=>kWeekend(RQ.m,x)).length;
-        if(RQ.b.size>=ru.max){toast(`אפשר לחסום עד ${ru.max} תאריכים. לימים נוספים סמנו "מעדיף שלא"`,3500);return}
+        if(rqUnits().length+(RQ.g==='A'?2:1)>ru.max){toast(`אפשר לחסום עד ${ru.max} תאריכים. לימים נוספים סמנו "מעדיף שלא"`,3500);return}
         if(kWeekend(RQ.m,d)&&wk>=ru.wk){toast(`אפשר לחסום עד ${ru.wk} ימי סופ״ש או חג. אפשר לסמן "מעדיף שלא"`,3500);return}
         RQ.b.add(d);RQ.s.delete(d);RQ.w.delete(d)}
     }else if(RQ.mode==='s'){if(RQ.s.has(d))RQ.s.delete(d);else{RQ.s.add(d);RQ.b.delete(d);RQ.w.delete(d)}}
@@ -1180,7 +1192,7 @@ $('#main').addEventListener('click',e=>{
   if(b.dataset.reject!==undefined){const q=S.pending[+b.dataset.reject];if(!confirm(`לדחות את הבקשה של ${q.n}? היא תימחק מהרשימה.`))return;S.pending.splice(+b.dataset.reject,1);save();render();toast('הבקשה נדחתה');return}
   if(b.id==='inFinalize'){finalizeSheet();return}
   if(b.id==='inReopen'){if(!confirm('לפתוח את הלוח לעריכה חופשית? בקשות חדשות ייכנסו שוב ישר ללוח.'))return;delete M().final;addLog(S.cur,'הלוח נפתח מחדש לעריכה');save();render();return}
-  if(b.id==='inApproveAll'){const ok=S.pending.filter(q=>!checkBlocks(q.m,q.g,q.b).errs.length);if(!ok.length){toast('אין בקשות שעומדות בכללים');return}
+  if(b.id==='inApproveAll'){const ok=S.pending.filter(q=>q.type!=='chg'&&!checkBlocks(q.m,q.g,q.bu||q.b).errs.length);if(!ok.length){toast('אין בקשות שעומדות בכללים');return}
     if(!confirm(`לאשר ${ok.length} בקשות? בקשות עם חריגה יישארו לבדיקה.`))return;if(ok.some(q=>q.m===S.cur))pushUndo();for(const q of ok)applyRequest(q);S.pending=S.pending.filter(q=>!ok.includes(q));save();render();toast(`${ok.length} בקשות אושרו`);return}
   if(b.dataset.rqedit){RQ=newRQ(S.cur);RQ.name=pname(b.dataset.rqedit);loadRQ();goTab('request');return}
 });
