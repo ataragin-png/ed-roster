@@ -309,6 +309,7 @@ try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){S=null}
 if(!S||S.v!==1||!S.months||!S.months[S.cur]) S=seedState();
 if(!S.settings.req)S.settings.req={...REQ_DEFAULT};
 if(!Array.isArray(S.pending))S.pending=[];
+if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
 if(!S.v7){S.v7=1;for(const t of S.types)if(t.code==='mc'){t.need=[0,0,0,0,0,0,0];t.filler=true}for(const k in S.months){const nv=S.months[k].needOv;for(const x in nv)if(/^mc\|/.test(x))delete nv[x]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v6){S.v6=1;for(const t of S.types)if(t.forSigners===undefined)t.forSigners=t.code==='c';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
