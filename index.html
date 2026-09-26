@@ -221,6 +221,19 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <div class="wrap"><main id="main" style="padding:0"></main></div>
 <div id="layer"></div>
 <script>
+const API_DEFAULT='__API__';
+let API=API_DEFAULT.startsWith('http')?API_DEFAULT:'';
+try{const u=new URLSearchParams(location.search).get('api');if(u&&/^https:\/\/script\.google(usercontent)?\.com\//.test(u)){API=u;localStorage.setItem('ed-api',u)}else if(!API)API=localStorage.getItem('ed-api')||''}catch(e){}
+async function sendQ(q,msg,okText){
+  if(!API){showMsg(msg,okText);return}
+  const sh=openSheet(`<h3>שולח…</h3><p class="sub">רגע אחד.</p>`);
+  try{const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'submit',q})});const j=await r.json();if(!j.ok)throw new Error(j.error||'שגיאה');
+    sh.el.innerHTML=`<h3>נשלח ✓</h3><p class="sub">${esc(okText)}</p><div class="done">הבקשה הגיעה לרכז/ת השיבוץ. אם תשנו משהו, שלחו שוב, והבקשה האחרונה היא שתיקבע.</div><div class="foot"><button class="btn primary" data-close>סגור</button></div>`;
+    try{localStorage.setItem('ed-last-sent',JSON.stringify({m:q.m,type:q.type||'req',ts:Date.now()}))}catch(e){}
+  }catch(e){sh.el.innerHTML=`<h3>השליחה נכשלה</h3><p class="sub">בדקו את החיבור לאינטרנט ונסו שוב.</p><div class="foot"><button class="btn primary" data-close>סגור</button></div>`}
+}
+function showMsg(msg,okText){const sh=openSheet(`<h3>ההודעה מוכנה</h3><p class="sub">שלחו אותה לרכז/ת השיבוץ. השורה האחרונה היא קוד שהמערכת קוראת, אל תשנו אותה.</p><textarea class="msgbox" readonly>${esc(msg)}</textarea><div class="done">${esc(okText)}</div><div class="foot"><button class="btn primary" id="shCopy">העתק</button>${navigator.share?'<button class="btn" id="shShare">שתף</button>':''}<button class="btn" data-close>סגור</button></div>`);
+  sh.el.querySelector('#shCopy').onclick=()=>copyText(msg);const sb=sh.el.querySelector('#shShare');if(sb)sb.onclick=()=>navigator.share({text:msg}).catch(()=>{})}
 const NAMES=["אברהם", "אוריה", "אחיה", "אליה", "אשר", "באסל", "בת שבע", "גנית", "דב", "דוד", "דנה", "ווד", "חיגאזי", "טבקמן", "יוני י", "יוסי", "מגד", "מיסק", "נועה", "סימא", "עוז", "עלי"];
 const RULES={A:6,R:5,wkA:3,wkR:2};
 const BASE={AS:11,AD:3,RD:6};
@@ -287,11 +300,15 @@ async function saveIcs(list){const txt=icsText(list),fname=`משמרות_${kLabe
   let dl=null;try{dl=window.claude&&await window.claude.use('downloads')}catch(e){}
   if(dl){try{await dl.save({filename:fname,data:new Blob([txt],{type:'text/calendar'})});toast('הקובץ נשמר')}catch(e){if(!(e&&e.code==='declined'))toast('השמירה לא הושלמה')}return}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));a.download=fname;document.body.appendChild(a);a.click();a.remove()}catch(e){toast('ההורדה לא זמינה בדפדפן הזה. השתמשו בכפתורי Google')}}
+let calFetched=false;
+async function fetchCal(manual){if(!API)return;try{const r=await fetch(API+'?action=calendar');const j=await r.json();if(j.ok&&j.cal){CAL=b64d(j.cal);localStorage.setItem('ed-cal-v1',JSON.stringify(CAL));if(VIEW==='cal')render();if(manual)toast('הלוח עודכן')}else if(manual)toast('עוד לא פורסם לוח')}catch(e){if(manual)toast('הטעינה נכשלה')}}
 function renderCal(){
+  if(API&&!calFetched){calFetched=true;fetchCal(false)}
   const names=CAL?Object.keys(CAL.a).sort((a,b)=>a.localeCompare(b,'he')):[];
-  let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>הוספת המשמרות שלך ליומן</strong><ul><li>מדביקים כאן את הודעת הלוח שרכז/ת השיבוץ שלח/ה בקבוצה (עם השורה שמתחילה ב־#CAL).</li><li>בוחרים את השם, ומוסיפים ליומן: כל המשמרות בקובץ אחד, או כל משמרת בנפרד ל־Google.</li><li>אחרי החלפה מאושרת תישלח הודעה חדשה. מדביקים אותה שוב ומעדכנים את היומן.</li></ul></div>
-  <textarea id="calPaste" class="msgbox" style="min-height:70px" placeholder="הדביקו כאן את הודעת הלוח"></textarea>
-  <div class="row" style="margin:8px 0 14px"><button class="btn" id="calLoad">טען לוח</button>${CAL?`<span style="color:var(--muted);font-size:13px">נטען: ${kLabel(CAL.m)}, עודכן ${new Date(CAL.ts).toLocaleDateString('he-IL')}</span>`:''}</div>`;
+  let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>הוספת המשמרות שלך ליומן</strong><ul>${API?'<li>הלוח המאושר נטען כאן אוטומטית.</li>':'<li>מדביקים כאן את הודעת הלוח שרכז/ת השיבוץ שלח/ה בקבוצה (עם השורה שמתחילה ב־#CAL).</li>'}<li>בוחרים את השם, ומוסיפים ליומן: כל המשמרות בקובץ אחד, או כל משמרת בנפרד ל־Google.</li><li>אחרי החלפה מאושרת תישלח הודעה חדשה. מדביקים אותה שוב ומעדכנים את היומן.</li></ul></div>
+  ${API?`<div class="row" style="margin:0 0 12px"><button class="btn" id="calFetch">טען את הלוח העדכני</button></div>`:''}
+  <textarea id="calPaste" ${API?'hidden':''} class="msgbox" style="min-height:70px" placeholder="הדביקו כאן את הודעת הלוח"></textarea>
+  <div class="row" style="margin:8px 0 14px">${API?'':'<button class="btn" id="calLoad">טען לוח</button>'}${CAL?`<span style="color:var(--muted);font-size:13px">נטען: ${kLabel(CAL.m)}, עודכן ${new Date(CAL.ts).toLocaleDateString('he-IL')}</span>`:''}</div>`;
   if(CAL){
     h+=`<div class="fields"><label>השם שלי<select id="calName"><option value="">בחרו</option>${names.map(n=>`<option ${norm(n)===norm(RQ.name)?'selected':''}>${esc(n)}</option>`).join('')}</select></label></div>`;
     const list=myShifts();
@@ -318,7 +335,7 @@ function renderChg(){
   ${CH.kind==='swap'?`<div class="fields"><label>המשמרת שלו/שלה שאני לוקח/ת${dateSel('chD2',CH.d2,key)}</label><label>&nbsp;${shiftSel('chC2',CH.c2)}</label></div>`:''}
   <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0 12px"><input type="checkbox" id="chAgree" ${CH.agree?'checked':''}> המתמחה השני מסכים לשינוי</label>
   <label style="display:block;font-size:13px;color:var(--muted);margin-bottom:4px" for="chT">הערה</label><textarea id="chT">${esc(CH.t)}</textarea>
-  <div class="row" style="margin-top:12px"><button class="btn primary" id="chSend">הכן הודעה לשליחה</button></div></div>`;
+  <div class="row" style="margin-top:12px"><button class="btn primary" id="chSend">${API?'שלח בקשה':'הכן הודעה לשליחה'}</button></div></div>`;
   $('#main').innerHTML=h;
 }
 function persist(){try{localStorage.setItem(DKEY,JSON.stringify({...RQ,b:[...RQ.b.entries()],s:[...RQ.s],w:[...RQ.w],vac:[...RQ.vac]}))}catch(e){}}
@@ -361,7 +378,7 @@ function render(){
     h+=`<button class="${cls}" data-rqday="${d}" title="${esc(hd?hd.name:'')}" aria-label="${d} ב${kLabel(key)}${hd?', '+hd.name:''}${lab?', '+lab:''}"><span class="num">${d}</span><small>${esc(lab)}</small></button>`;
   }
   h+=`</div><label style="display:block;font-size:13px;color:var(--muted);margin-bottom:4px" for="rqNotes">בקשות נוספות והערות</label><textarea id="rqNotes" placeholder="למשל: מעדיף לילות">${esc(RQ.t)}</textarea>
-  <div class="row" style="margin-top:12px"><button class="btn primary" id="rqSend">הכן הודעה לשליחה</button><button class="btn" id="rqReset">נקה את הלוח</button></div></div>`;
+  <div class="row" style="margin-top:12px"><button class="btn primary" id="rqSend">${API?'שלח בקשה':'הכן הודעה לשליחה'}</button><button class="btn" id="rqReset">נקה את הלוח</button></div></div>`;
   $('#main').innerHTML=h;
 }
 function quota(){const f=Math.max(0,1-RQ.vac.size/kDim(RQ.m));return RQ.g==='A'?`מכסה משוערת: ${Math.round(BASE.AS*f)} משמרות ו־${Math.round(BASE.AD*f)} תורנויות`:`מכסה משוערת: ${Math.round(BASE.RD*f)} תורנויות`}
@@ -384,6 +401,7 @@ document.addEventListener('click',e=>{
     try{CAL=b64d(m[1]);localStorage.setItem('ed-cal-v1',JSON.stringify(CAL))}catch(e){if(!CAL||!CAL.a){toast('הקוד פגום. העתיקו את כל ההודעה');return}}
     toast('הלוח נטען');render();return}
   if(b.id==='calIcs'){saveIcs(myShifts());return}
+  if(b.id==='calFetch'){fetchCal(true);return}
   if(b.dataset.chk){CH.kind=b.dataset.chk;render();return}
   if(b.id==='chSend'){
     const miss=[];if(!norm(RQ.name))miss.push('השם שלך');if(!CH.d1||!CH.c1)miss.push('המשמרת שלך');if(!norm(CH.w))miss.push('שם המתמחה השני');if(CH.kind==='swap'&&(!CH.d2||!CH.c2))miss.push('המשמרת של המתמחה השני');
@@ -392,9 +410,7 @@ document.addEventListener('click',e=>{
     if(!CH.agree&&!confirm('לא סימנת שהמתמחה השני מסכים. לשלוח בכל זאת?'))return;
     const q={v:1,type:'chg',m:CH.m,n:norm(RQ.name),kind:CH.kind,d1:+CH.d1,c1:CH.c1,w:norm(CH.w),d2:CH.kind==='swap'?+CH.d2:null,c2:CH.kind==='swap'?CH.c2:null,agree:CH.agree,t:CH.t.trim(),ts:Date.now()};
     const L=[`בקשת ${q.kind==='swap'?'החלפה':'מסירת משמרת'} ל${kLabel(q.m)}`,`${q.n}: ${TNAME[q.c1]} ב־${q.d1}`,q.kind==='swap'?`מתחלף עם ${q.w}: ${TNAME[q.c2]} ב־${q.d2}`:`עובר ל${q.w}`,`המתמחה השני מסכים: ${q.agree?'כן':'לא סומן'}`];
-    if(q.t)L.push('הערה: '+q.t);L.push('','#CHG:'+b64e(q));const msg=L.join('\n');
-    const sh=openSheet(`<h3>ההודעה מוכנה</h3><p class="sub">שלחו אותה לרכז/ת השיבוץ. השורה האחרונה היא קוד שהמערכת קוראת, אל תשנו אותה.</p><textarea class="msgbox" readonly>${esc(msg)}</textarea><div class="done">השינוי ייכנס ללוח רק אחרי אישור.</div><div class="foot"><button class="btn primary" id="shCopy">העתק</button>${navigator.share?'<button class="btn" id="shShare">שתף</button>':''}<button class="btn" data-close>סגור</button></div>`);
-    sh.el.querySelector('#shCopy').onclick=()=>copyText(msg);const sb=sh.el.querySelector('#shShare');if(sb)sb.onclick=()=>navigator.share({text:msg}).catch(()=>{});
+    if(q.t)L.push('הערה: '+q.t);L.push('','#CHG:'+b64e(q));sendQ(q,L.join('\n'),'בקשת ההחלפה נשלחה. השינוי ייכנס ללוח רק אחרי אישור.');
     return}
   if(b.dataset.bpart!==undefined){RQ.bpart=b.dataset.bpart;persist();render();return}
   if(b.dataset.rqg){RQ.g=b.dataset.rqg;RQ.wcode='';persist();render();return}
@@ -422,9 +438,7 @@ document.addEventListener('click',e=>{
     if(!norm(RQ.name)){toast('כתבו את השם שלכם');$('#rqName').focus();return}
     if(RQ.vac.size&&!norm(RQ.vby)){toast('כתבו מי אישר את החופשה');return}
     const chk=checkBlocks(RQ.m,RQ.g,units());if(chk.errs.length){ruleModal('הבקשה חורגת מהכללים',[...chk.errs,'תקנו את החסימות בלוח ונסו שוב.']);return}
-    const msg=message(buildReq());
-    const sh=openSheet(`<h3>ההודעה מוכנה</h3><p class="sub">שלחו אותה בוואטסאפ לרכז/ת השיבוץ. השורה האחרונה היא קוד שהמערכת קוראת, אל תשנו אותה.</p><textarea class="msgbox" readonly>${esc(msg)}</textarea><div class="done">אם תשנו משהו לפני שהלוח נבנה, שלחו הודעה חדשה והיא תחליף את הקודמת.</div><div class="foot"><button class="btn primary" id="shCopy">העתק</button>${navigator.share?'<button class="btn" id="shShare">שתף</button>':''}<button class="btn" data-close>סגור</button></div>`);
-    sh.el.querySelector('#shCopy').onclick=()=>copyText(msg);const sb=sh.el.querySelector('#shShare');if(sb)sb.onclick=()=>navigator.share({text:msg}).catch(()=>{});
+    const q=buildReq();q.type='req';sendQ(q,message(q),`הבקשות שלך ל${kLabel(q.m)} נשלחו.`);
   }
 });
 document.addEventListener('input',e=>{const id=e.target.id;if(id==='chN'){RQ.name=e.target.value;persist();return}if(id==='chW'){CH.w=e.target.value;return}if(id==='chT'){CH.t=e.target.value;return}if(id==='rqNotes')RQ.t=e.target.value;else if(id==='rqRot')RQ.rot=e.target.value;else if(id==='rqName')RQ.name=e.target.value;else if(id==='rqVby')RQ.vby=e.target.value;else return;persist()});
