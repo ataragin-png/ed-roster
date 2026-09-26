@@ -661,7 +661,7 @@ function renderPeople(){
 
 function renderLuach(){
   const N=dim(); const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
-  let h=`<div class="status"><button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button><button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
+  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
   for(let d=1;d<=N;d++){
     h+=`<tr class="${dayClass(d)}"><td class="num">${d}</td><td>${WD[wd(d)]}${dtype(d)&&holName(S.cur,d)?' ('+holName(S.cur,d)+')':dtype(d)==='hol'?' (חג)':dtype(d)==='eve'?' (ערב חג)':''}</td>`;
     for(const t of cols){const f=filled(t.code,d), n=need(t.code,d);h+=f.length?`<td>${esc(f.map(pname).join(', '))}</td>`:n?`<td class="miss">חסר</td>`:`<td></td>`}
@@ -711,6 +711,10 @@ function renderSettings(){
   <label>חסימות ברוטציה<input type="number" data-rs="R" value="${st.req.R}"></label>
   <label>מתוכן בסופ״ש, רוטציה<input type="number" data-rs="wkR" value="${st.req.wkR}"></label>
   <label>מועד אחרון להגשה<input type="text" data-rs="deadline" value="${esc(st.req.deadline)}" placeholder="למשל 20.10" style="width:130px"></label></div></div>
+  <div class="panel"><h2>שרת הבקשות</h2><p class="hint">כשהשרת מחובר, המתמחים שולחים בקשות והחלפות ישירות מהטופס, והן מגיעות לכאן בלי וואטסאפ. גם הלוח המאושר מתפרסם להם דרכו. המפתח נשמר רק בדפדפן שלך.</p>
+  <div class="kv"><label>כתובת השרת (Web App)<input type="text" data-rs="apiUrl" value="${esc(S.settings.apiUrl||'')}" dir="ltr" placeholder="https://script.google.com/macros/s/…/exec" style="width:min(460px,80vw)"></label>
+  <label>מפתח<input type="text" data-rs="apiKey" value="${esc(S.settings.apiKey||'')}" dir="ltr" style="width:220px"></label></div>
+  <div class="row" style="margin-top:10px"><button class="btn" id="bApiTest">בדוק חיבור</button></div></div>
   <div class="panel"><h2>קישור לטופס המתמחים</h2><p class="hint">הקישור שמופיע בהודעת התזכורת ובהודעת היומן. אם העליתם את הטופס לאתר משלכם, הדביקו כאן את הכתובת החדשה.</p><div class="kv"><label>כתובת הטופס<input type="text" data-rs="formUrl" value="${esc(formUrl())}" dir="ltr" style="width:min(460px,80vw)"></label></div></div>
   <div class="panel"><h2>נתונים</h2><p class="hint">הנתונים נשמרים בדפדפן הזה בלבד. כדי להעביר הכול למחשב אחר או לאתר אחר (כולל הגדרות, חותמים, מאושרים ובקשות ממתינות), הורידו גיבוי מלא וטענו אותו שם.</p>
   <div class="row" style="margin-bottom:12px"><button class="btn primary" id="bBackup">הורד גיבוי מלא</button><button class="btn" id="bRestore">טען גיבוי</button><input type="file" id="restoreIn" accept=".json" class="hidden"></div><button class="btn danger" id="bReset">מחק הכול וטען את דוגמת ספטמבר 2026</button></div>`;
@@ -1097,9 +1101,11 @@ function renderInbox(){
     const chk=checkBlocks(S.cur,r.group==='R'?'R':'A',blockUnits(pid,r.group==='R'?'R':'A')); if(r.reqAt)sub++;
     return{pid,r,b,s,w,chk};
   });
-  let h=`<div class="panel"><h2>קליטת הודעות</h2><p class="hint">הדביקו כאן הודעות מוואטסאפ, אפשר כמה יחד. בקשות לבניית הלוח נכנסות ישר ללוח. אחרי שהלוח אושר סופית, כל בקשה חדשה וכל החלפה ממתינות לאישור שלך.</p>
-  <textarea id="inPaste" class="msgbox" style="min-height:110px" placeholder="הדביקו הודעות שמכילות #REQ: או #CHG:"></textarea>
-  <div class="row" style="margin-top:10px"><button class="btn primary" id="inGo">קלוט הודעות</button><button class="btn" id="inRemind">הודעת תזכורת לקבוצה</button></div></div>`;
+  let h=`<div class="panel"><h2>בקשות מהטופס</h2>${apiOn()?`<p class="hint">בקשות והחלפות שהמתמחים שולחים מהטופס מגיעות לכאן ישירות. בקשות לבניית הלוח נכנסות ישר ללוח; אחרי שהלוח אושר סופית, כל בקשה וכל החלפה ממתינות לאישור שלך.${S.apiLast?` נבדק לאחרונה: ${new Date(S.apiLast).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}.`:''}</p>
+  <div class="row"><button class="btn primary" id="inPull">משוך בקשות חדשות</button><button class="btn" id="inRemind">הודעת תזכורת לקבוצה</button></div>`:`<p class="hint" style="color:var(--warn);font-weight:600">שרת הבקשות עוד לא מחובר, ולכן הבקשות מגיעות כהודעות. כדי שיגיעו ישירות, מגדירים את השרת בלשונית "משמרות וכללים".</p>`}
+  <details style="margin-top:12px"${apiOn()?'':' open'}><summary style="cursor:pointer;color:var(--muted);font-size:13px">הדבקה ידנית של הודעות (#REQ / #CHG)</summary>
+  <textarea id="inPaste" class="msgbox" style="min-height:90px;margin-top:8px" placeholder="הדביקו הודעות שמכילות #REQ: או #CHG:"></textarea>
+  <div class="row" style="margin-top:8px"><button class="btn" id="inGo">קלוט הודעות</button>${apiOn()?'':'<button class="btn" id="inRemind">הודעת תזכורת לקבוצה</button>'}</div></details></div>`;
   h+=`<div class="row" style="justify-content:space-between;margin:4px 0 8px"><h2 style="font-size:16px;margin:0">ממתינים לאישור שלך (${S.pending.length})</h2></div>`;
   h+=S.pending.length?S.pending.map((q,i)=>q.type==='chg'?chgCard(q,i):pendingCard(q,i)).join(''):`<p class="hint" style="color:var(--muted);margin:0 0 16px">אין בקשות שממתינות לאישור.</p>`;
   const log=(M().log||[]).slice(-15).reverse();
@@ -1121,29 +1127,62 @@ function renderInbox(){
 }
 function addLog(key,text){const mo=S.months[key];if(!mo)return;(mo.log=mo.log||[]).push({ts:Date.now(),text})}
 function ingest(txt){
-  const reqs=[...txt.matchAll(/#REQ:([A-Za-z0-9+/=]+)/g)], chgs=[...txt.matchAll(/#CHG:([A-Za-z0-9+/=]+)/g)];
-  if(!reqs.length&&!chgs.length){toast('לא נמצא קוד #REQ או #CHG בטקסט שהודבק',4000);return}
-  const applied=[],queued=[];let bad=0,undone=false;
+  const found=[...txt.matchAll(/#(REQ|CHG):([A-Za-z0-9+/=]+)/g)];
+  if(!found.length){toast('לא נמצא קוד #REQ או #CHG בטקסט שהודבק',4000);return}
+  const list=[];let bad=0;
+  for(const f of found){try{const q=b64d(f[2]);q.type=f[1]==='CHG'?'chg':'req';list.push(q)}catch(e){bad++}}
+  $('#inPaste')&&($('#inPaste').value='');
+  ingestQs(list,bad);
+}
+function ingestQs(list,bad=0){
+  const applied=[],queued=[];let undone=false;
   const queue=q=>{const i=S.pending.findIndex(x=>x.type===q.type&&x.m===q.m&&norm(x.n)===norm(q.n)&&(q.type==='req'||(x.d1===q.d1&&x.c1===q.c1)));
     if(i>=0){if((S.pending[i].ts||0)<=(q.ts||0))S.pending[i]=q}else S.pending.push(q);queued.push(q)};
-  for(const f of reqs){let q;try{q=b64d(f[1])}catch(e){bad++;continue}
+  list.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  for(const q of list){
+    if(q.type==='chg'){if(!q||!q.m||!q.n||!q.w||!q.d1||!q.c1){bad++;continue}q.n=norm(q.n);q.w=norm(q.w);queue(q);continue}
     if(!q||!q.m||!q.n||!Array.isArray(q.b)){bad++;continue}
-    q.n=norm(q.n);q.type='req';
+    q.n=norm(q.n);
     if(S.months[q.m]&&S.months[q.m].final){queue(q);continue}
     if(q.m===S.cur&&!undone){pushUndo();undone=true}
-    applied.push({q,...applyRequest(q)})}
-  for(const f of chgs){let q;try{q=b64d(f[1])}catch(e){bad++;continue}
-    if(!q||!q.m||!q.n||!q.w||!q.d1||!q.c1){bad++;continue}
-    q.n=norm(q.n);q.w=norm(q.w);q.type='chg';queue(q)}
-  save();$('#inPaste')&&($('#inPaste').value='');
+    const i=applied.findIndex(x=>x.q.m===q.m&&norm(x.q.n)===q.n);const res={q,...applyRequest(q)};if(i>=0)applied[i]=res;else applied.push(res)}
+  save();
   const months=[...new Set(applied.map(x=>x.q.m))];
   if(!queued.length&&months.length===1&&months[0]!==S.cur){S.cur=months[0];undoStack=[];$('#bUndo').disabled=true;save()}
   render();
-  let html=`<h3>נקלטו ${applied.length+queued.length} הודעות</h3>`;
-  if(applied.length)html+=`<h4>נכנסו ישר ללוח</h4><ul class="issues" style="padding-right:18px">${applied.map(x=>{const c=checkBlocks(x.q.m,x.q.g,x.q.bu||x.q.b);return`<li class="${c.errs.length?'err':''}">${esc(x.p.name)} (${kLabel(x.q.m)}): ${x.q.b.length} חסימות${x.q.vac&&x.q.vac.length?`, <b>${x.q.vac.length} ימי חופשה מאושרת (אישר: ${esc(x.q.vby||'לא צוין')})</b>`:''}${x.isNew?', מתמחה חדש נוסף לרשימה':''}${x.mismatch?', הגיש בקבוצה אחרת מזו שבלוח':''}${c.errs.length?', '+esc(c.errs.join(', ')):''}</li>`}).join('')}</ul>`;
+  let html=`<h3>נקלטו ${applied.length+queued.length} בקשות</h3>`;
+  if(applied.length)html+=`<h4>נכנסו ישר ללוח</h4><ul class="issues" style="padding-right:18px">${applied.map(x=>{const c=checkBlocks(x.q.m,x.q.g,x.q.bu||x.q.b);return`<li class="${c.errs.length?'err':''}">${esc(x.p.name)} (${kLabel(x.q.m)}): ${(x.q.bu||x.q.b).length} חסימות${x.q.vac&&x.q.vac.length?`, <b>${x.q.vac.length} ימי חופשה מאושרת (אישר: ${esc(x.q.vby||'לא צוין')})</b>`:''}${x.isNew?', מתמחה חדש נוסף לרשימה':''}${x.mismatch?', הגיש בקבוצה אחרת מזו שבלוח':''}${c.errs.length?', '+esc(c.errs.join(', ')):''}</li>`}).join('')}</ul>`;
   if(queued.length)html+=`<h4>ממתינים לאישור שלך</h4><ul class="issues" style="padding-right:18px">${queued.map(q=>`<li>${esc(q.n)}: ${q.type==='chg'?(q.kind==='swap'?'בקשת החלפה':'בקשה למסור משמרת'):'בקשה ללוח שכבר נסגר'}</li>`).join('')}</ul>`;
-  if(bad)html+=`<p class="errs">${bad} קודים פגומים לא נקלטו</p>`;
+  if(bad)html+=`<p class="errs">${bad} בקשות פגומות לא נקלטו</p>`;
   openSheet(html+`<div class="foot"><button class="btn primary" data-close>סגור</button></div>`);
+}
+function apiOn(){return!!(S.settings.apiUrl&&S.settings.apiKey)}
+let pulling=false;
+async function pullRequests(auto){
+  if(!apiOn()){if(!auto)toast('צריך להגדיר את שרת הבקשות בלשונית משמרות וכללים',4000);return}
+  if(pulling)return;pulling=true;
+  try{const r=await fetch(S.settings.apiUrl+'?action=requests&key='+encodeURIComponent(S.settings.apiKey));const j=await r.json();
+    if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם לשרת':String(j.error||'שגיאה'));
+    const seen=new Set(S.apiSeen||[]);const fresh=(j.items||[]).filter(x=>!seen.has(x.row));
+    S.apiLast=Date.now();
+    if(!fresh.length){save();if(!auto)toast('אין בקשות חדשות');if(tab==='inbox')render();return}
+    fresh.forEach(x=>seen.add(x.row));S.apiSeen=[...seen];
+    const list=fresh.map(x=>{const q=x.q||{};q.type=q.type==='chg'?'chg':'req';return q});
+    ingestQs(list,0);
+  }catch(e){toast('משיכת הבקשות נכשלה: '+e.message,4500)}
+  finally{pulling=false}
+}
+async function publishCalendar(){
+  if(!apiOn()){calSheet();return}
+  if(!M().final&&!confirm('הלוח עוד לא אושר סופית. לפרסם בכל זאת?'))return;
+  try{const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'publish',key:S.settings.apiKey,m:S.cur,cal:calCode()})});const j=await r.json();
+    if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם לשרת':String(j.error||'שגיאה'));M().publishedAt=Date.now();save();render();toast('הלוח פורסם. המתמחים יראו אותו בלשונית "הלוח שלי"',4500)}
+  catch(e){toast('הפרסום נכשל: '+e.message,4500)}
+}
+async function testApi(){
+  if(!apiOn()){toast('מלאו כתובת ומפתח');return}
+  try{const r=await fetch(S.settings.apiUrl+'?action=requests&key='+encodeURIComponent(S.settings.apiKey));const j=await r.json();if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם לשרת':String(j.error));toast(`החיבור עובד. יש בשרת ${j.items.length} בקשות`,4000)}
+  catch(e){toast('החיבור נכשל: '+e.message,4500)}
 }
 function pendingCard(q,i){
   const p=findPerson(q.n),mo=S.months[q.m],r=p&&mo&&mo.roster[p.id],chk=checkBlocks(q.m,q.g,q.bu||q.b);
@@ -1231,7 +1270,7 @@ function remindSheet(){
     `• רוטציה: אפשר לחסום עד ${r.R} תאריכים לתורנויות, מתוכם עד ${r.wkR} בסופ״ש או בחג.`,
     '• לא כל החסימות יכולות להיות בסופ״ש.','• אפשר לבקש משמרות מסוימות שרוצים לעשות.',
     '• מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות.','',
-    `מגישים כאן, ושולחים לי את ההודעה שנוצרת: ${formUrl()}`].filter((l,i)=>!(i===1&&!l)).join('\n')};
+    `${apiOn()?'ממלאים את הטופס ולוחצים "שלח בקשה"':'מגישים כאן, ושולחים לי את ההודעה שנוצרת'}: ${formUrl()}`].filter((l,i)=>!(i===1&&!l)).join('\n')};
   const sh=openSheet(`<h3>הודעת תזכורת לקבוצה</h3><p class="sub">ההודעה כוללת את הכללים ואת הקישור לטופס. אפשר לשנות מגבלות ומועד אחרון בלשונית "משמרות וכללים".</p>
   <div class="row" style="margin-bottom:8px"><select id="rmM" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px">${monthOpts().map(k=>`<option value="${k}" ${k===key?'selected':''}>${kLabel(k)}</option>`).join('')}</select></div>
   <textarea class="msgbox" id="rmTxt">${esc(draw(key))}</textarea><div class="foot"><button class="btn primary" id="rmCopy">העתק</button><button class="btn" data-close>סגור</button></div>`);
@@ -1259,6 +1298,8 @@ $('#main').addEventListener('click',e=>{
   if(b.id==='rqReset'){if(!confirm('לנקות את הטופס?'))return;RQ=newRQ(RQ.m);renderRequest();return}
   if(b.id==='inGo'){ingest($('#inPaste').value);return}
   if(b.id==='inRemind'){remindSheet();return}
+  if(b.id==='inPull'){pullRequests(false);return}
+  if(b.id==='bApiTest'){testApi();return}
   if(b.dataset.approve!==undefined){approve(+b.dataset.approve);return}
   if(b.dataset.reject!==undefined){const q=S.pending[+b.dataset.reject];if(!confirm(`לדחות את הבקשה של ${q.n}? היא תימחק מהרשימה.`))return;S.pending.splice(+b.dataset.reject,1);save();render();toast('הבקשה נדחתה');return}
   if(b.id==='inFinalize'){finalizeSheet();return}
@@ -1280,7 +1321,7 @@ $('#main').addEventListener('change',e=>{
 });
 
 /* ---------- events ---------- */
-function goTab(t){tab=t;S.lastTab=t;save();render()}
+function goTab(t){tab=t;S.lastTab=t;save();render();if(t==='inbox')pullRequests(true)}
 document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)goTab(b.dataset.tab)});
 $('#monthSel').addEventListener('change',e=>{S.cur=e.target.value;undoStack=[];$('#bUndo').disabled=true;save();render()});
 $('#bAuto').onclick=()=>{const b=$('#bAuto');b.disabled=true;b.textContent='מחשב שיבוץ…';setTimeout(()=>{try{autofill()}finally{b.disabled=false;b.textContent='מלא משבצות חסרות'}},30)};
@@ -1305,6 +1346,7 @@ $('#main').addEventListener('click',e=>{
   if(b.id==='bAddP'){const id=uid();S.people.push({id,name:'מתמחה חדש'});M().roster[id]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();const inp=document.querySelector(`tr[data-pid="${id}"] input[data-f="name"]`);inp&&(inp.focus(),inp.select());return}
   if(b.id==='bCopy'){copyLuach();return}
   if(b.id==='bCal'){calSheet();return}
+  if(b.id==='bPub'){publishCalendar();return}
   if(b.dataset.tdel!==undefined){const t=S.types[+b.dataset.tdel];if(!confirm(`למחוק את "${t.name}"? שיבוצים קיימים בקוד ${t.code} יסומנו כקוד לא מוכר.`))return;S.types.splice(+b.dataset.tdel,1);save();renderSettings();return}
   if(b.id==='bAddT'){S.types.push(T('x'+(S.types.length+1),'משמרת חדשה','חדש','duty','16:00','08:00',['A','R'],[0,0,0,0,0,0,0],'slate'));save();renderSettings();return}
   if(b.id==='bResetT'){if(!confirm('להחזיר את רשימת המשמרות לברירת המחדל?'))return;S.types=defaultTypes();save();renderSettings();return}
@@ -1333,6 +1375,7 @@ $('#main').addEventListener('change',e=>{
     else r[f]=el.value;
     save();if(f==='group'||f==='extraVac'||f==='tS'||f==='tD')renderPeople();return}
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
+  if(el.dataset.rs==='apiUrl'||el.dataset.rs==='apiKey'){S.settings[el.dataset.rs]=el.value.trim();save();return}
   if(el.dataset.rs==='formUrl'){S.settings.formUrl=el.value.trim();save();return}
   if(el.dataset.rs){const k=el.dataset.rs;S.settings.req[k]=k==='deadline'?el.value.trim():(Number(el.value)||0);save();return}
   const ttr=el.closest('tr[data-ti]');
@@ -1346,6 +1389,7 @@ $('#main').addEventListener('change',e=>{
     save();}
 });
 render();
+if(tab==='inbox')pullRequests(true);
 </script>
 </body>
 </html>
