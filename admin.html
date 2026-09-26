@@ -280,7 +280,7 @@ function defaultTypes(){
     T('g','בוקר צד ג','ג׳','day','08:00','16:00',['R'],none,'slate'),
     T('p','תורנות צד ג (פנימית)','פנ׳','duty','16:00','08:00',['A','R'],none,'rose'),
     T('c','מהלכים פנימית (פנימית ב)','מהל פנ','duty','16:00','08:00',['A','R'],none,'rose'),
-    T('mc','בוקר מהלכים כירורגיה','כיר ב','shift','09:00','21:00',['A','R'],wkd,'olive'),
+    T('mc','בוקר מהלכים כירורגיה','כיר ב','shift','09:00','21:00',['A','R'],none,'olive'),
     T('nc','ערב מהלכים כירורגיה','כיר ע','shift','21:00','09:00',['A','R'],all,'olive'),
     T('o','אורטופדיה','אורט','duty','16:00','08:00',['A','R'],none,'violet'),
     T('k','ילדים','ילד׳','duty','16:00','08:00',['A','R'],none,'violet'),
@@ -288,7 +288,7 @@ function defaultTypes(){
     T('a','מד״א','מד״א','shift','08:00','16:00',['A'],none,'slate'),
     T('z','בוקר אורתופדיה','או״ב','shift','08:00','16:00',['A'],none,'violet'),
     T('t','סטאז׳ר','סטאז','other','08:00','16:00',['A','R'],none,'slate')
-  ].map(t=>({...t,signer:['n','v','bv','p'].includes(t.code),loc:DEF_LOC[t.code]||'',extra:['i','k','o'].includes(t.code),internal:['p','c'].includes(t.code),restrict:t.code==='k',filler:['z','a'].includes(t.code),sigReq:t.code==='nc'?[0,1,1,1,0,0,0]:null,forSigners:t.code==='c'}));
+  ].map(t=>({...t,signer:['n','v','bv','p'].includes(t.code),loc:DEF_LOC[t.code]||'',extra:['i','k','o'].includes(t.code),internal:['p','c'].includes(t.code),restrict:t.code==='k',filler:['mc','z','a'].includes(t.code),sigReq:t.code==='nc'?[0,1,1,1,0,0,0]:null,forSigners:t.code==='c'}));
 }
 function uid(){return 'p'+Math.random().toString(36).slice(2,9)}
 function groupFromRot(rot){rot=(rot||'').trim(); if(/אגף\s*א/.test(rot)) return 'A'; if(/מילואים|חל״ד|חופשת לידה/.test(rot)) return 'X'; return 'R'}
@@ -301,7 +301,7 @@ function seedState(){
     roster[id]=blankRoster(g, g==='A'?'אגף א':r.rot, r.notes, i);
     for(const d in r.cells){cells[id+'|'+d]={c:r.cells[d].slice(),mk:''}}
   });
-  return {v:1,v3:1,v4:1,v5:1,v6:1,sigInit:1,locInit:1,typesV2:1,cur:'2026-09',lastTab:'request',settings:{baseAS:11,baseAD:3,baseRD:6,minRest:12,maxCont:26,intMin:15,req:{...REQ_DEFAULT}},types:defaultTypes(),people,
+  return {v:1,v3:1,v4:1,v5:1,v6:1,v7:1,sigInit:1,locInit:1,typesV2:1,cur:'2026-09',lastTab:'request',settings:{baseAS:11,baseAD:3,baseRD:6,minRest:12,maxCont:26,intMin:15,req:{...REQ_DEFAULT}},types:defaultTypes(),people,
     months:{'2026-09':{roster,cells,dayTypes:{11:'eve',12:'hol',13:'hol',20:'eve',21:'hol',25:'eve',26:'hol'},needOv:{}}}};
 }
 let S=null;
@@ -310,6 +310,7 @@ if(!S||S.v!==1||!S.months||!S.months[S.cur]) S=seedState();
 if(!S.settings.req)S.settings.req={...REQ_DEFAULT};
 if(!Array.isArray(S.pending))S.pending=[];
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v7){S.v7=1;for(const t of S.types)if(t.code==='mc'){t.need=[0,0,0,0,0,0,0];t.filler=true}for(const k in S.months){const nv=S.months[k].needOv;for(const x in nv)if(/^mc\|/.test(x))delete nv[x]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v6){S.v6=1;for(const t of S.types)if(t.forSigners===undefined)t.forSigners=t.code==='c';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v5){S.v5=1;for(const t of S.types){if(t.code==='p'||t.code==='c')t.extra=false;if(t.code==='nc'&&!t.sigReq)t.sigReq=[0,1,1,1,0,0,0]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v4){S.v4=1;for(const t of S.types){if(t.code==='z'){t.kind='shift';t.name='בוקר אורתופדיה';t.groups=['A']}if(t.code==='a'){t.kind='shift';t.groups=['A']}if(t.filler===undefined)t.filler=['z','a'].includes(t.code)}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -351,11 +352,15 @@ function qualified(pid,t){return!t.restrict||!!(person(pid)?.quals||{})[t.code]}
 function internalCount(){let n=0;for(let d=1;d<=dim();d++)for(const t of S.types)if(t.internal)n+=filled(t.code,d).length;return n}
 function homeOf(pid){const r=M().roster[pid];if(!r||r.group!=='R')return'';if(r.home!==undefined)return r.home;return/ב\s*\+\s*ג|צד\s*ב|כירורגיה/.test(r.rot||'')?'b':''}
 function sigReqOn(t,d){return!!(t.sigReq&&t.sigReq[wd(d)])}
-const PARTS={'':'כל היום',day:'יום (09–21)',night:'לילה (21–09)'};
+const PARTS={'':'כל היום',day:'יום (09–21)',night:'לילה (21–09)',duty:'תורנות (16–08)'};
 function blockWin(d,part){const b=(d-1)*1440;return part==='day'?{s:b+540,e:b+1260}:{s:b+1260,e:b+1980}}
-function blockHit(pid,x,d0){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='off')continue;
-  if(!cl.part){if(dd===d0)return'יום שלם';continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
+function blockHit(pid,x,d0,t){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='off')continue;
+  if(!cl.part){if(dd===d0)return'יום שלם';continue}
+  if(cl.part==='duty'){if(dd===d0&&t&&t.kind==='duty')return`תורנות ב־${dd}`;continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
 function blockUnits(pid,g){const u=[];for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);if(cl.mk!=='off')continue;u.push(d);if(g==='A'&&!cl.part)u.push(d)}return u}
+const WCAT={'@day':'משמרת יום','@night':'משמרת לילה','@duty':'תורנות'};
+function wcName(wc){return WCAT[wc]||typeBy(wc)?.name||wc}
+function wcMatch(wc,t){if(!wc)return true;if(wc==='@day')return isMorn(t)&&!isNight(t)&&t.kind!=='duty';if(wc==='@night')return isNight(t)&&t.kind==='shift';if(wc==='@duty')return t.kind==='duty';return wc===t.code}
 function isICU(pid){const r=M().roster[pid];return!!r&&r.group==='R'&&/ICU|טנ.?צ|טיפול\s*נמרץ/i.test(r.rot||'')}
 function wkndMorning(t,d){return t.code==='b'&&isWeekend(d)}
 function person(id){return S.people.find(p=>p.id===id)}
@@ -398,9 +403,9 @@ function analyze(){
       }
       if(r.group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
       if(cl.c.length&&cl.mk==='vac')add(pid,d,'err','שובץ ביום חופש');
-      for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d);if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
+      for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d,typeBy(code));if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
       if(cl.c.length&&cl.mk==='soft')add(pid,d,'warn','שובץ ביום שביקש שלא');
-      if(cl.mk==='want'&&cl.wc&&cl.c.length&&!cl.c.includes(cl.wc))add(pid,d,'warn',`ביקש ${typeBy(cl.wc)?.name||cl.wc}`);
+      if(cl.mk==='want'&&cl.wc&&cl.c.length&&!cl.c.some(c=>typeBy(c)&&wcMatch(cl.wc,typeBy(c))))add(pid,d,'warn',`ביקש ${wcName(cl.wc)}`);
     }
     {const nd=new Set(list.filter(x=>isNight(typeBy(x.code))).map(x=>x.d));for(const d of nd)if(nd.has(d-1)&&nd.has(d-2))add(pid,d,'warn','שלושה לילות ברצף')}
     list.sort((a,b)=>a.s-b.s);
@@ -443,7 +448,7 @@ function evaluate(pid,t,d,ctx){
   if(!t.groups.includes(r.group)){hard=true;why.push('לא מתאים לקבוצה')}
   const cl0=cellOf(pid,d),mk=cl0.mk;
   if(mk==='vac'){hard=true;why.push('חופש')}
-  {const bh=blockHit(pid,iv(t.code,d),d);if(bh){hard=true;why.push(`חסום: ${bh}`)}}
+  {const bh=blockHit(pid,iv(t.code,d),d,t);if(bh){hard=true;why.push(`חסום: ${bh}`)}}
   if(ctx.days[pid].has(d)){hard=true;why.push('כבר משובץ ביום זה')}
   if(t.loc){const x0=iv(t.code,d);const o=(ctx.occ[t.loc]||[]).find(y=>y.pid!==pid&&x0.s<y.e&&y.s<x0.e);if(o){hard=true;why.push(`${t.loc} תפוס (${pname(o.pid)})`)}}
   const x=iv(t.code,d);
@@ -464,7 +469,7 @@ function evaluate(pid,t,d,ctx){
   if(!qualified(pid,t)){hard=true;why.push(`לא מאושר ל${t.name}`)}
   if(t.signer&&isSigner(pid))why.push('חותם שחרור');
   if(mk==='soft'){score-=8;why.push('ביקש שלא')}
-  if(mk==='want'){if(!cl0.wc||cl0.wc===t.code){score+=cl0.wc?10:6;why.push('ביקש לעבוד')}else{score+=0.5;why.push(`ביקש ${typeBy(cl0.wc)?.short||cl0.wc}`)}}
+  if(mk==='want'){if(wcMatch(cl0.wc,t)){score+=cl0.wc?10:6;why.push('ביקש לעבוד')}else{score+=0.5;why.push(`ביקש ${wcName(cl0.wc)}`)}}
   const p=(r.pref||{})[t.code];
   if(p===1){score+=4;why.push('מעדיף')} if(p===-1){score-=9;why.push('לא מעדיף')}
   const G=ctx.gs[r.group],fr=ctx.frac[pid],dev=k=>c[k]-(G.f?G[k]/G.f:0)*fr;
@@ -522,12 +527,12 @@ function autofill(){
         for(const d of days)for(const t of extraTypes){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random();if(sc>bs){bs=sc;bt=t;bd=d}}
         if(bt){put(pid,bt,bd);any=true}}
       if(!any)break}
-    // שלב 4: השלמת משמרות לאגף א בבוקר אורתופדיה או מד״א
+    // שלב 4: השלמת משמרות לאגף א: קודם בוקר מהלכים כירורגיה, אחר כך בוקר אורתופדיה או מד״א
     const fillT=S.types.filter(t=>t.filler);
     if(fillT.length)for(const pid of ids.filter(p=>M().roster[p].group==='A').sort(()=>Math.random()-.5)){
       let def=ctx.tgt[pid].S-ctx.cnt[pid].shift;
       while(def>0){let bt=null,bd=0,bs=-1e9;
-        for(let d=1;d<=N;d++){if(isWeekend(d))continue;for(const t of fillT){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random();if(sc>bs){bs=sc;bt=t;bd=d}}}
+        for(let d=1;d<=N;d++){if(isWeekend(d))continue;for(const [fi,t] of fillT.entries()){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random()+3*(fillT.length-fi);if(sc>bs){bs=sc;bt=t;bd=d}}}
         if(!bt)break;put(pid,bt,bd);def--}
     }
     let cost=unfilled*1000+Math.max(0,intMin-intN)*400;for(let d=1;d<=N;d++)if(!covered.has(d))cost+=500;
@@ -600,9 +605,9 @@ function renderGrid(){
     for(let d=1;d<=N;d++){
       const cl=cellOf(pid,d), is=A.issues[pid+'|'+d];
       const cls=[dayClass(d),cl.mk?'mk-'+cl.mk:'',is?is.lvl:'','cellwrap'].join(' ');
-      const ptag=cl.mk==='off'&&cl.part?`<span style="position:absolute;bottom:1px;right:3px;font-size:9.5px;font-weight:700;color:var(--muted)">${cl.part==='day'?'י':'ל'}</span>`:'';
+      const ptag=cl.mk==='off'&&cl.part?`<span style="position:absolute;bottom:1px;right:3px;font-size:9.5px;font-weight:700;color:var(--muted)">${cl.part==='day'?'י':cl.part==='duty'?'ת':'ל'}</span>`:'';
       const chips=ptag+cl.c.map(c=>{const t=typeBy(c);return t?`<span class="chip c-${t.color}">${esc(t.short)}</span>`:`<span class="chip c-slate">${esc(c)}</span>`}).join('');
-      const tip=[pname(pid)+', '+fmtDate(d),...cl.c.map(c=>typeBy(c)?.name||c),cl.mk?MARKS[cl.mk]+(cl.wc?': '+(typeBy(cl.wc)?.name||cl.wc):'')+(cl.mk==='off'&&cl.part?': '+PARTS[cl.part]:''):'',...(is?is.msgs:[])].filter(Boolean).join('\n');
+      const tip=[pname(pid)+', '+fmtDate(d),...cl.c.map(c=>typeBy(c)?.name||c),cl.mk?MARKS[cl.mk]+(cl.wc?': '+wcName(cl.wc):'')+(cl.mk==='off'&&cl.part?': '+PARTS[cl.part]:''):'',...(is?is.msgs:[])].filter(Boolean).join('\n');
       h+=`<td class="${cls}"><button class="cell" data-p="${pid}" data-d="${d}" title="${esc(tip)}" aria-label="${esc(tip)}">${chips}</button></td>`;
     }
     h+=`</tr>`;
@@ -675,7 +680,7 @@ function renderSettings(){
   <label>מנוחה מינימלית (שעות)<input type="number" data-s="minRest" value="${st.minRest}"></label>
   <label>רצף מקסימלי (שעות)<input type="number" data-s="maxCont" value="${st.maxCont}"></label>
   <label>מינימום תורנויות פנימית בחודש<input type="number" data-s="intMin" value="${st.intMin??15}"></label></div>
-  <p class="hint" style="margin-top:12px">סדר המילוי האוטומטי: קודם משבצות החובה בכל יום (אגף א, צד ב, מהלכים לילה ומה שמסומן בימים), אחר כך מכסת הפנימית (צד ג ומהלכים פנימית), אחר כך השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה או ילדים (רק למאושרים), ובסוף, למתמחי אגף א שעדיין חסרות להם משמרות (לא בגלל חופשה), בוקר אורתופדיה או מד״א בימי חול.</p></div>`;
+  <p class="hint" style="margin-top:12px">סדר המילוי האוטומטי: קודם משבצות החובה בכל יום (אגף א, צד ב, מהלכים לילה ומה שמסומן בימים), אחר כך מכסת הפנימית (צד ג ומהלכים פנימית), אחר כך השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה או ילדים (רק למאושרים), ובסוף, למתמחי אגף א שעדיין חסרות להם משמרות (לא בגלל חופשה), בוקר מהלכים כירורגיה ואחריו בוקר אורתופדיה או מד״א בימי חול.</p></div>`;
   h+=`<div class="panel"><h2>סוגי משמרות</h2><p class="hint">הקודים זהים לקודים בגיליון הבקשות. בכל מקום יכול לעבוד רק אדם אחד בכל רגע, לכן משמרות שחופפות בזמן ובמקום לא ישובצו לשני אנשים. מתמחה ברוטציה שעושה בוקר וערב מהלכים כירורגיה באותו יום (24 שעות) נספר כתורנות אחת. סמנו לאיזו קבוצה כל משמרת מתאימה, באילו משמרות חותם שחרור מכסה את הלילה, ובאילו ימים היא נדרשת (ערב חג נחשב כשישי, חג נחשב כשבת). אפשר גם להדליק או לכבות דרישה ליום בודד מלחיצה על שורת הכיסוי בלוח.</p><div class="tablewrap"><table class="form"><thead><tr><th>קוד</th><th>שם</th><th>קיצור</th><th title="בכל מקום יכול להיות רק אדם אחד בכל רגע. ריק = ללא הגבלה">מקום</th><th>סוג</th><th>משעה</th><th>עד</th><th>אגף א</th><th>סבב</th><th title="חותם שחרור במשמרת הזו מכסה את הלילה">חותם בלילה</th><th title="נספר במכסת הפנימית החודשית">פנימית</th><th title="בפנימית: חותם שחרור ישובץ עדיף כאן">פנימית לחותמים</th><th title="משלים משמרות למתמחי אגף א שלא הגיעו למכסה">משלים לאגף א</th><th title="משובץ בשלב ההשלמה, אחרי החובה והפנימית">השלמה</th><th title="רק מתמחים מאושרים יכולים להיות משובצים">דורש אישור</th><th>נדרש בימים</th><th title="בימים המסומנים רק חותם שחרור יכול לקבל את המשמרת">חותם חובה בימים</th><th>צבע</th><th></th></tr></thead><tbody>`;
   S.types.forEach((t,i)=>{
     h+=`<tr data-ti="${i}"><td><input type="text" class="w-short" data-tf="code" value="${esc(t.code)}" dir="ltr"></td>
@@ -735,7 +740,7 @@ function cellSheet(pid,d){
     if(other.length)h+=`<details style="margin-top:8px"><summary style="color:var(--muted);font-size:13px;cursor:pointer">משמרות של קבוצה אחרת</summary><div class="opts" style="margin-top:6px">${other.map(optBtn).join('')}</div></details>`;
     h+=`<h4>סימון</h4><div class="opts">${Object.entries(MARKS).map(([k,v])=>`<button class="opt" data-mk="${k}" aria-pressed="${(cl.mk||'')===k}">${v}</button>`).join('')}</div>`;
     if(cl.mk==='off'&&r.group==='A')h+=`<h4>מה חסום</h4><div class="opts">${Object.entries(PARTS).map(([k,v])=>`<button class="opt" data-part="${k}" aria-pressed="${(cl.part||'')===k}">${v}</button>`).join('')}</div>`;
-    if(cl.mk==='want')h+=`<h4>איזו משמרת ביקש</h4><div class="opts"><button class="opt" data-wc="" aria-pressed="${!cl.wc}">כל משמרת</button>${elig.map(t=>`<button class="opt" data-wc="${t.code}" aria-pressed="${cl.wc===t.code}"><span class="chip c-${t.color}">${esc(t.short)}</span>${esc(t.name)}</button>`).join('')}</div>`;
+    if(cl.mk==='want')h+=`<h4>איזו משמרת ביקש</h4><div class="opts"><button class="opt" data-wc="" aria-pressed="${!cl.wc}">כל משמרת</button>${Object.entries(WCAT).map(([k,v])=>`<button class="opt" data-wc="${k}" aria-pressed="${cl.wc===k}">${v}</button>`).join('')}${elig.map(t=>`<button class="opt" data-wc="${t.code}" aria-pressed="${cl.wc===t.code}"><span class="chip c-${t.color}">${esc(t.short)}</span>${esc(t.name)}</button>`).join('')}</div>`;
     if(is)h+=`<ul class="issues">${is.msgs.map(m=>`<li class="${is.lvl}">${esc(m)}</li>`).join('')}</ul>`;
     if(r.notes)h+=`<h4>בקשות המתמחה</h4><div class="note">${esc(r.notes)}</div>`;
     h+=`<div class="foot"><button class="btn primary" data-close>סיום</button><button class="btn" data-clearcell>נקה תא</button></div>`;
@@ -827,7 +832,8 @@ function importXlsx(file){
   const fr=new FileReader();
   fr.onload=()=>{
     try{
-      const wb=XLSX.read(new Uint8Array(fr.result),{type:'array'});
+      const wb=XLSX.read(new Uint8Array(fr.result),{type:'array',cellStyles:true});
+      if(colorImport(wb))return;
       const sn=wb.SheetNames.find(n=>/bakashot/i.test(n))||wb.SheetNames[0];
       const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''});
       let hr=-1,c1=-1;
@@ -879,6 +885,71 @@ async function saveFile(fname,blob){
   try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast('הקובץ ירד')}catch(e){toast('ההורדה לא זמינה בדפדפן הזה')}
 }
 function backupDownload(){const d=new Date();saveFile(`גיבוי_שיבוץ_${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}.json`,new Blob([JSON.stringify(S)],{type:'application/json'}))}
+const LEGEND=[['wantDay',/רוצה\s*יום/],['wantNight',/רוצה\s*לילה/],['wantDuty',/רוצה\s*תורנ/],['blockDay',/לא\s*יום/],['blockNight',/לא\s*לילה/],['blockDuty',/לא\s*תורנ/],['mil',/מילואים/],['vac',/חופש/],['course',/קורס/]];
+const LEGEND_HE={wantDay:'רוצה יום',wantNight:'רוצה לילה',wantDuty:'רוצה תורנות',blockDay:'לא יום',blockNight:'לא לילה',blockDuty:'לא תורנות',mil:'מילואים',vac:'חופשה',course:'קורס'};
+function fillOf(ws,r,c){const cell=ws[XLSX.utils.encode_cell({r,c})];const f=cell&&cell.s;if(!f||!f.patternType||f.patternType==='none')return'';const rgb=((f.fgColor&&f.fgColor.rgb)||'').slice(-6).toUpperCase();return rgb&&rgb!=='FFFFFF'&&rgb!=='000000'?rgb:''}
+function valOf(ws,r,c){const cell=ws[XLSX.utils.encode_cell({r,c})];if(!cell||cell.v===undefined||cell.v===null)return'';return typeof cell.v==='string'?cell.v.trim():cell.v}
+function colorImport(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];if(!ws||!ws['!ref'])return false;const rg=XLSX.utils.decode_range(ws['!ref']);
+  let hr=-1,c1=-1;for(let r=0;r<=Math.min(rg.e.r,12)&&hr<0;r++)for(let c=0;c<=rg.e.c-3;c++)if(Number(valOf(ws,r,c))===1&&Number(valOf(ws,r,c+1))===2&&Number(valOf(ws,r,c+2))===3){hr=r;c1=c;break}
+  if(hr<1)return false;
+  const legend={};for(let r=0;r<hr;r++)for(let c=0;c<=rg.e.c;c++){const v=String(valOf(ws,r,c)||'');const f=fillOf(ws,r,c);if(!v||!f)continue;const hit=LEGEND.find(([k,re])=>re.test(v));if(hit&&!Object.values(legend).includes(hit[0]))legend[f]=hit[0]}
+  if(Object.keys(legend).length<3)return false;
+  let nd=0;while(Number(valOf(ws,hr,c1+nd))===nd+1)nd++;
+  const yr=Number(valOf(ws,hr+1,0))||ym()[0], wd1=String(valOf(ws,hr+1,c1)||'').trim();
+  const cands=[];for(let m=1;m<=12;m++){const k=`${yr}-${pad2(m)}`;if(kDim(k)===nd&&WD[kWd(k,1)]===wd1)cands.push(k)}
+  const now=new Date(),nowKey=`${now.getFullYear()}-${pad2(now.getMonth()+1)}`;
+  const key=cands.find(k=>k>=nowKey)||cands[0]||S.cur;
+  const rgb=h=>[0,2,4].map(i=>parseInt(h.slice(i,i+2),16));
+  const approx={};const meaning=f=>{if(legend[f])return legend[f];let best=null,bd=1e9;for(const L in legend){const a=rgb(f),b=rgb(L);const dd=(a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2;if(dd<bd){bd=dd;best=L}}if(best&&bd<9000){approx[f]=legend[best];return legend[best]}return''};
+  const people=[],orphan=[];let cur=null,lastRow=-5,blank=0;
+  for(let r=hr+2;r<=rg.e.r;r++){
+    const nm=norm(valOf(ws,r,0));const marks={};let any=false;
+    let rowAny=!!nm;for(let c=1;c<=c1+nd+1&&!rowAny;c++)if(fillOf(ws,r,c)||valOf(ws,r,c)!=='')rowAny=true;
+    if(!rowAny){if(++blank>=4)break;continue}blank=0;
+    for(let d=1;d<=nd;d++){const f=fillOf(ws,r,c1+d-1);if(!f)continue;const m=meaning(f);if(!m)continue;(marks[d]=marks[d]||new Set()).add(m);any=true}
+    const rot=norm(valOf(ws,r,c1+nd)),notes=norm(valOf(ws,r,c1+nd+1));
+    if(nm&&!HEB_MONTHS.some(x=>nm===x)){cur={name:nm,rot,notes,marks:{},row:r+1};people.push(cur);lastRow=r}
+    else if(any&&cur&&r===lastRow+1){lastRow=r}
+    else{if(any)orphan.push(r+1);continue}
+    for(const d in marks){cur.marks[d]=cur.marks[d]||new Set();for(const m of marks[d])cur.marks[d].add(m)}
+    if(!nm&&notes)cur.notes=(cur.notes?cur.notes+' ':'')+notes;
+  }
+  if(!people.length)return false;
+  const html=`<h3>ייבוא בקשות לפי צבעים</h3><p class="sub">נמצא מקרא של ${Object.keys(legend).length} צבעים ו־${people.length} מתמחים.</p>
+  <div class="row" style="margin-bottom:8px"><label style="font-size:13px;color:var(--muted)">לחודש <select id="ciM">${[...new Set([key,...cands,...monthOpts()])].sort().map(k=>`<option value="${k}" ${k===key?'selected':''}>${kLabel(k)}</option>`).join('')}</select></label></div>
+  <ul class="issues" style="padding-right:18px">${Object.entries(legend).map(([f,m])=>`<li><span class="sw" style="background:#${f};display:inline-block;vertical-align:-2px"></span> ${LEGEND_HE[m]}</li>`).join('')}</ul>
+  ${Object.keys(approx).length?`<p class="sub" style="color:var(--warn);font-weight:600">צבעים שלא במקרא ופוענחו לפי הצבע הקרוב: ${Object.entries(approx).map(([f,m])=>`<span class="sw" style="background:#${f};display:inline-block;vertical-align:-2px"></span> ← ${LEGEND_HE[m]}`).join(', ')}</p>`:''}
+  ${orphan.length?`<p class="sub" style="color:var(--warn);font-weight:600">שורות עם סימונים בלי שם מתמחה, שלא נקלטו: ${orphan.join(', ')}</p>`:''}
+  <p class="sub">הייבוא יחליף את הלוח של החודש שנבחר, אם קיים.</p><div class="foot"><button class="btn primary" id="ciGo">ייבא</button><button class="btn" data-close>ביטול</button></div>`;
+  const sh=openSheet(html);
+  sh.el.querySelector('#ciGo').onclick=()=>{const k=sh.el.querySelector('#ciM').value;const res=applyColorImport(k,people);sh.close();S.cur=k;undoStack=[];$('#bUndo').disabled=true;save();tab='inbox';render();
+    openSheet(`<h3>יובאו ${people.length} מתמחים ל${kLabel(k)}</h3><ul class="issues" style="padding-right:18px">${res.map(x=>`<li class="${x.errs.length?'err':''}">${esc(x.name)} (${esc(x.rot||GROUPS[x.g])}): ${x.units} חסימות${x.vac?`, ${x.vac} ימי היעדרות`:''}${x.want?`, ${x.want} בקשות לעבוד`:''}${x.errs.length?', '+esc(x.errs.join(', ')):''}</li>`).join('')}</ul><div class="foot"><button class="btn primary" data-close>סגור</button></div>`)};
+  return true;
+}
+function applyColorImport(key,people){
+  const old=S.months[key],prev=S.months[S.cur],roster={},cells={},out=[];let order=0;
+  for(const P of people){
+    let p=findPerson(P.name);if(!p){p={id:uid(),name:P.name};S.people.push(p)}
+    const g=groupFromRot(P.rot);const src=(old&&old.roster[p.id])||(prev&&prev.roster[p.id]);
+    roster[p.id]={...blankRoster(g,g==='A'?'אגף א':P.rot,P.notes,order++),pref:{...((src&&src.pref)||{})}};
+    if(src&&src.home!==undefined)roster[p.id].home=src.home;
+    const reasons=new Set();let vac=0,want=0;
+    for(const d in P.marks){const M_=P.marks[d];const k=p.id+'|'+d;
+      const abs=['vac','mil','course'].filter(x=>M_.has(x));
+      if(abs.length){cells[k]={c:[],mk:'vac'};vac++;abs.forEach(x=>reasons.add(LEGEND_HE[x]));continue}
+      const parts=[['blockDay','day'],['blockNight','night'],['blockDuty','duty']].filter(([x])=>M_.has(x)).map(([,y])=>y);
+      if(parts.length){cells[k]={c:[],mk:'off'};if(g==='A'&&parts.length===1)cells[k].part=parts[0];continue}
+      const w=[['wantDay','@day'],['wantNight','@night'],['wantDuty','@duty']].filter(([x])=>M_.has(x)).map(([,y])=>y);
+      if(w.length){cells[k]={c:[],mk:'want'};if(w.length===1)cells[k].wc=w[0];want++}}
+    roster[p.id].reqAt=Date.now();roster[p.id].reqG=g==='R'?'R':'A';if(reasons.size)roster[p.id].vacBy=[...reasons].join(', ');
+    out.push({pid:p.id,name:P.name,rot:P.rot,g,vac,want});
+  }
+  S.months[key]={roster,cells,dayTypes:(old&&old.dayTypes)||autoTypes(key),autoHol:1,needOv:{}};
+  const saveCur=S.cur;S.cur=key;
+  for(const x of out){const g=x.g==='R'?'R':'A';const u=blockUnits(x.pid,g);x.units=u.length;x.errs=x.g==='X'?[]:checkBlocks(key,g,u).errs}
+  S.cur=saveCur;return out;
+}
 function copyLuach(){
   const N=dim(); const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
   const lines=[['תאריך','יום',...cols.map(t=>t.name)].join('\t')];
@@ -1083,7 +1154,7 @@ function pendingCard(q,i){
   if(r&&r.reqAt)notes.push('יחליף בקשה קודמת');
   return`<div class="panel" style="margin-bottom:10px;padding:12px 14px"><div class="row" style="justify-content:space-between"><div><strong style="font-size:15px">${esc(q.n)}</strong> <span style="color:var(--muted);font-size:13px">בקשות ל${kLabel(q.m)}, ${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+esc(q.r):'')}, נשלח ${q.ts?new Date(q.ts).toLocaleDateString('he-IL'):''}</span></div>
   <div class="row"><button class="btn small primary" data-approve="${i}">אשר</button><button class="btn small danger" data-reject="${i}">דחה</button></div></div>
-  <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p[1]==='day'?'יום':'לילה'):''})`}).join(', '))||'אין'}</div>
+  <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p[1]==='day'?'יום':p[1]==='duty'?'תורנות':'לילה'):''})`}).join(', '))||'אין'}</div>
   ${q.vac&&q.vac.length?`<div><b>חופשה מאושרת (אישר: ${esc(q.vby||'לא צוין')}):</b> ${esc(dl(q.vac))}</div>`:''}
   ${q.s.length?`<div><b>מעדיף שלא:</b> ${esc(dl(q.s))}</div>`:''}
   ${q.w.length?`<div><b>רוצה לעבוד:</b> ${esc(q.w.map(([d,c])=>c?`${d} (${typeBy(c)?.name||c})`:String(d)).join(', '))}</div>`:''}
