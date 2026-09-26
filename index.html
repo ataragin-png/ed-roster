@@ -246,9 +246,9 @@ function kWd(key,d){const[y,m]=key.split('-').map(Number);return new Date(y,m-1,
 function kWeekend(key,d){const w=kWd(key,d);return w===5||w===6||!!hol(key)[d]}
 function kLabel(key){const[y,m]=key.split('-').map(Number);return`${HEB_MONTHS[m-1]} ${y}`}
 function monthOpts(){const n=new Date(),o=[];for(let i=0;i<3;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);o.push(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return o}
-const PART={'':'כל היום',day:'יום 09–21',night:'לילה 21–09'};
+const PART={'':'כל היום',day:'יום 09–21',night:'לילה 21–09',duty:'תורנות 16–08'};
 function units(){const u=[];for(const[d,p]of RQ.b){u.push(d);if(RQ.g==='A'&&!p)u.push(d)}return u}
-function blockLabel(p){return RQ.g==='A'&&p?(p==='day'?'חסום יום':'חסום לילה'):'חסום'}
+function blockLabel(p){return RQ.g==='A'&&p?(p==='day'?'חסום יום':p==='duty'?'חסום תורנות':'חסום לילה'):'חסום'}
 function ruleModal(title,lines){openSheet(`<h3>${esc(title)}</h3><ul class="issues" style="padding-right:18px;margin-top:8px">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="foot"><button class="btn primary" data-close>הבנתי</button></div>`)}
 function rulesFor(g){return g==='R'?{max:RULES.R,wk:RULES.wkR}:{max:RULES.A,wk:RULES.wkA}}
 function checkBlocks(key,g,b){const ru=rulesFor(g),wk=b.filter(d=>kWeekend(key,d)).length,errs=[];
@@ -328,7 +328,7 @@ function render(){
   if(VIEW==='cal')return renderCal();
   const key=RQ.m,N=kDim(key),chk=checkBlocks(key,RQ.g,units()),H=hol(key);
   let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>כללי הגשת בקשות</strong><ul>
-  <li>אגף א (פיילוט): אפשר לחסום עד ${RULES.A} משמרות, מתוכן עד ${RULES.wkA} בסופ״ש או בחג. חוסמים יום (09–21) או לילה (21–09). חסימת יום שלם נספרת כשתי משמרות.</li>
+  <li>אגף א (פיילוט): אפשר לחסום עד ${RULES.A} משמרות, מתוכן עד ${RULES.wkA} בסופ״ש או בחג. חוסמים יום (09–21), לילה (21–09) או תורנות (16–08). חסימת יום שלם נספרת כשתי משמרות.</li>
   <li>רוטציה: אפשר לחסום עד ${RULES.R} תאריכים לתורנויות, מתוכם עד ${RULES.wkR} בסופ״ש או בחג.</li>
   <li>לא כל החסימות יכולות להיות בסופ״ש.</li>
   <li>אפשר לבקש משמרות מסוימות שרוצים לעשות.</li>
@@ -367,7 +367,7 @@ function render(){
 function quota(){const f=Math.max(0,1-RQ.vac.size/kDim(RQ.m));return RQ.g==='A'?`מכסה משוערת: ${Math.round(BASE.AS*f)} משמרות ו־${Math.round(BASE.AD*f)} תורנויות`:`מכסה משוערת: ${Math.round(BASE.RD*f)} תורנויות`}
 function b64e(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))))}
 function buildReq(){return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),vac:[...RQ.vac].sort((a,b)=>a-b),vby:norm(RQ.vby),b:[...RQ.b.keys()].sort((a,b)=>a-b),bp:RQ.g==='A'?[...RQ.b].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],bu:units().sort((a,b)=>a-b),s:[...RQ.s].sort((a,b)=>a-b),w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
-function message(q){const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.bu.length}${q.g==='A'?' משמרות':''}): ${q.b.map(d=>{const p=(q.bp.find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':'לילה'})`:String(d)}).join(', ')||'אין'}`];
+function message(q){const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.bu.length}${q.g==='A'?' משמרות':''}): ${q.b.map(d=>{const p=(q.bp.find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':p==='duty'?'תורנות':'לילה'})`:String(d)}).join(', ')||'אין'}`];
   if(q.vac.length)L.push(`חופשה מאושרת (${q.vac.length} ימים, אישר: ${q.vby}): ${q.vac.join(', ')}`);
   if(q.s.length)L.push(`מעדיף שלא: ${q.s.join(', ')}`);
   if(q.w.length)L.push(`רוצה לעבוד: ${q.w.map(([d,c])=>c?`${d} (${TNAME[c]||c})`:String(d)).join(', ')}`);
