@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px"></p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -325,7 +325,46 @@ if(!S.v3){S.v3=1;const all=[1,1,1,1,1,1,1],none=[0,0,0,0,0,0,0];
 if(!S.typesV2){S.typesV2=1;const D=defaultTypes();for(const code of ['b','v','bv','g','p','c','mc','nc']){const d=D.find(t=>t.code===code),t=S.types.find(t=>t.code===code);if(!d)continue;if(t){Object.assign(t,{name:d.name,short:d.short,kind:d.kind,start:d.start,end:d.end,loc:d.loc});for(const g of d.groups)if(!t.groups.includes(g))t.groups.push(g)}}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF_LOC[t.code]||'';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
+let syncTimer=null,syncMsg='';
+function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el)el.textContent=t}
+function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
+function monthTab(key){
+  const saveCur=S.cur;S.cur=key;try{
+    const N=dim(),A=analyze(),rows=[['שם','קבוצה',...[...Array(N)].map((_,i)=>i+1),'משמרות','תורנויות','סופ״ש','הערות'],['','',...[...Array(N)].map((_,i)=>WD[wd(i+1)]+(dtype(i+1)==='hol'?' חג':dtype(i+1)==='eve'?' ע״ח':'')),'','','','']];
+    for(const pid of rosterIds()){const r=M().roster[pid],P=A.per[pid];
+      rows.push([pname(pid),r.group==='A'?'אגף א':r.group==='X'?(r.rot||'לא זמין'):(r.rot||'רוטציה'),...[...Array(N)].map((_,i)=>{const cl=cellOf(pid,i+1);const parts=cl.c.map(c=>typeBy(c)?.short||c);if(cl.mk==='vac')parts.push('חופש');else if(cl.mk==='off')parts.push(cl.part==='day'?'חסום יום':cl.part==='night'?'חסום לילה':cl.part==='duty'?'חסום תורנות':'חסום');return parts.join(' + ')}),P.cnt.shift,P.cnt.duty,P.cnt.wk.size,r.notes||''])}
+    rows.push([]);rows.push(['לוח יומי']);
+    const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
+    rows.push(['תאריך','יום',...cols.map(t=>t.name)]);
+    for(let d=1;d<=N;d++)rows.push([d,WD[wd(d)],...cols.map(t=>{const f=filled(t.code,d);return f.length?f.map(pname).join(', '):need(t.code,d)?'חסר':''})]);
+    return{name:kLabel(key)+(M().final?' (סופי)':''),base:kLabel(key),rows};
+  }finally{S.cur=saveCur}
+}
+async function pushState(){
+  if(!(S.settings.apiUrl&&S.settings.apiKey))return;
+  if(!S.synced){loadFromServer();return}
+  try{const st={...S,settings:{...S.settings,apiKey:''}};
+    const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'saveState',key:S.settings.apiKey,ts:S.savedAt,state:JSON.stringify(st),tab:monthTab(S.cur)})});const j=await r.json();
+    if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם':j.error==='action'?'צריך לעדכן את הקוד בגיליון':String(j.error));
+    setSync('נשמר בגיליון '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}))}
+  catch(e){setSync('השמירה בגיליון נכשלה: '+e.message)}
+}
+async function loadFromServer(){
+  if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;
+  setSync('בודק בגיליון…');
+  try{const r=await fetch(S.settings.apiUrl+'?action=state&key='+encodeURIComponent(S.settings.apiKey));const j=await r.json();
+    if(!j.ok){setSync(j.error==='action'?'צריך לעדכן את הקוד בגיליון':'');return}
+    const markSynced=()=>{S.synced=true;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+    if(!j.state){markSynced();pushState();return}
+    if(!S.synced||Number(j.ts)>(S.savedAt||0)){
+      if(!S.synced&&S.savedAt&&Number(j.ts)<S.savedAt&&!confirm(`בגיליון שמורים נתונים מ־${new Date(Number(j.ts)).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}. לטעון אותם? הנתונים שבמכשיר הזה יוחלפו.\n(ביטול ישמור את הנתונים שבמכשיר הזה בגיליון במקום)`)){markSynced();pushState();return}
+      const x=JSON.parse(j.state);x.synced=true;x.settings=x.settings||{};x.settings.apiUrl=S.settings.apiUrl;x.settings.apiKey=S.settings.apiKey;x.lastTab=tab;
+      try{localStorage.setItem(KEY,JSON.stringify(x))}catch(e){}location.reload();return}
+    if(Number(j.ts)<(S.savedAt||0)){pushState();return}
+    setSync('מעודכן מול הגיליון')}
+  catch(e){setSync('אין חיבור לגיליון')}
+}
 
 let undoStack=[];
 function pushUndo(){undoStack.push(JSON.stringify(S.months[S.cur]));if(undoStack.length>25)undoStack.shift();document.getElementById('bUndo').disabled=false}
@@ -713,7 +752,7 @@ function renderSettings(){
   <label>חסימות ברוטציה<input type="number" data-rs="R" value="${st.req.R}"></label>
   <label>מתוכן בסופ״ש, רוטציה<input type="number" data-rs="wkR" value="${st.req.wkR}"></label>
   <label>מועד אחרון להגשה<input type="text" data-rs="deadline" value="${esc(st.req.deadline)}" placeholder="למשל 20.10" style="width:130px"></label></div></div>
-  <div class="panel"><h2>שרת הבקשות</h2><p class="hint">כשהשרת מחובר, המתמחים שולחים בקשות והחלפות ישירות מהטופס, והן מגיעות לכאן בלי וואטסאפ. גם הלוח המאושר מתפרסם להם דרכו. המפתח נשמר רק בדפדפן שלך.</p>
+  <div class="panel"><h2>שרת הבקשות</h2><p class="hint">כשהשרת מחובר, המתמחים שולחים בקשות והחלפות ישירות מהטופס, והן מגיעות לכאן בלי וואטסאפ. גם הלוח המאושר מתפרסם להם דרכו. בנוסף, כל הנתונים שלך נשמרים אוטומטית בגיליון, וכל חודש מקבל בו לשונית משלו, כך שאפשר לפתוח את האתר מכל מחשב או טלפון. המפתח נשמר רק בדפדפן, וצריך להזין אותו פעם אחת בכל מכשיר.</p>
   <div class="kv"><label>כתובת השרת (Web App)<input type="text" data-rs="apiUrl" value="${esc(S.settings.apiUrl||'')}" dir="ltr" placeholder="https://script.google.com/macros/s/…/exec" style="width:min(460px,80vw)"></label>
   <label>מפתח<input type="text" data-rs="apiKey" value="${esc(S.settings.apiKey||'')}" dir="ltr" style="width:220px"></label></div>
   <div class="row" style="margin-top:10px"><button class="btn" id="bApiTest">בדוק חיבור</button></div></div>
@@ -1395,7 +1434,7 @@ $('#main').addEventListener('change',e=>{
     else r[f]=el.value;
     save();if(f==='group'||f==='extraVac'||f==='tS'||f==='tD')renderPeople();return}
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
-  if(el.dataset.rs==='apiUrl'||el.dataset.rs==='apiKey'){S.settings[el.dataset.rs]=el.value.trim();save();return}
+  if(el.dataset.rs==='apiUrl'||el.dataset.rs==='apiKey'){const had=S.savedAt;S.settings[el.dataset.rs]=el.value.trim();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(S.settings.apiUrl&&S.settings.apiKey)loadFromServer();return}
   if(el.dataset.rs==='formUrl'){S.settings.formUrl=el.value.trim();save();return}
   if(el.dataset.rs){const k=el.dataset.rs;S.settings.req[k]=k==='deadline'?el.value.trim():(Number(el.value)||0);save();return}
   const ttr=el.closest('tr[data-ti]');
@@ -1409,7 +1448,7 @@ $('#main').addEventListener('change',e=>{
     save();}
 });
 render();
-if(tab==='inbox')pullRequests(true);
+loadFromServer().then(()=>{if(tab==='inbox')pullRequests(true)});
 </script>
 </body>
 </html>
