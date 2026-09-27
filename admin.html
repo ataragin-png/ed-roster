@@ -676,9 +676,41 @@ function renderGrid(){
   $('#main').innerHTML=h;
 }
 
+function planLabelToGroup(l){l=norm(l);if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return{g:'A',rot:'אגף א'};if(/מילואים|שלב\s*ב|מחקר|לא\s*פעיל|חל.?ד|חופשת\s*לידה/.test(l))return{g:'X',rot:l};return{g:'R',rot:l}}
+function applyPlan(key){const mo=S.months[key];if(!mo||!S.rotPlan)return 0;let n=0;
+  for(const pid in S.rotPlan){const G=planLabelToGroup((S.rotPlan[pid]||{})[key]);if(!G||!person(pid))continue;let r=mo.roster[pid];
+    if(!r){mo.roster[pid]=blankRoster(G.g,G.rot,'',Object.keys(mo.roster).length+1);n++;continue}
+    if(r.group!==G.g||r.rot!==G.rot){r.group=G.g;r.rot=G.rot;n++}}return n}
+function planMonths(){const n=new Date(),set=new Set(Object.keys(S.months));for(const pid in (S.rotPlan||{}))for(const k in S.rotPlan[pid])set.add(k);for(let i=0;i<4;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);set.add(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return[...set].sort().slice(-8)}
+function matchName(raw){const clean=x=>norm(x).replace(/["'׳״`]/g,'');const n=clean(raw);if(!n)return null;
+  return S.people.find(p=>clean(p.name)===n)||S.people.find(p=>{const c=clean(p.name);return c.length>1&&(n.startsWith(c+' ')||n.endsWith(' '+c)||c.startsWith(n+' ')||c.endsWith(' '+n))})||null}
+function importPlanText(txt){
+  const lines=txt.split(/\r?\n/).map(l=>l.split('\t')).filter(r=>r.some(c=>norm(c)));if(!lines.length)return toast('לא נמצא טקסט');
+  let hi=lines.findIndex(r=>r.some(c=>HEB_MONTHS.some(m=>norm(c).startsWith(m))));if(hi<0)return toast('לא נמצאה שורת כותרת עם שמות חודשים',4000);
+  const now=new Date(),nowKey=`${now.getFullYear()}-${pad2(now.getMonth()+1)}`,cols={};
+  lines[hi].forEach((c,i)=>{const t=norm(c);const mi=HEB_MONTHS.findIndex(m=>t.startsWith(m));if(mi<0)return;const ym_=t.match(/(20\d\d)/);let y=ym_?+ym_[1]:now.getFullYear();if(!ym_){const k0=`${y}-${pad2(mi+1)}`;if(k0<nowKey&&(now.getMonth()-mi)>4)y++}cols[i]=`${y}-${pad2(mi+1)}`});
+  S.rotPlan=S.rotPlan||{};const added=[],unmatched=[];let cnt=0;
+  for(const r of lines.slice(hi+1)){let ni=r.findIndex((c,i)=>!(i in cols)&&norm(c)&&!/^\d+$/.test(norm(c)));if(ni<0)continue;const raw=norm(r[ni]);let p=matchName(raw);
+    if(!p){p={id:uid(),name:raw};S.people.push(p);added.push(raw)}
+    for(const i in cols){const v=norm(r[i]);if(!v)continue;(S.rotPlan[p.id]=S.rotPlan[p.id]||{})[cols[i]]=v;cnt++}}
+  const months=[...new Set(Object.values(cols))];let changed=0;for(const k of months)if(S.months[k]&&!S.months[k].final)changed+=applyPlan(k);
+  save();renderPeople();
+  openSheet(`<h3>תכנית הסבבים עודכנה</h3><p class="sub">${cnt} שיבוצים ל${months.map(kLabel).join(', ')}. ${changed?`עודכנו ${changed} מתמחים בחודשים שכבר קיימים באתר.`:''}</p>${added.length?`<p class="sub" style="color:var(--warn);font-weight:600">שמות שלא זוהו ונוספו כמתמחים חדשים: ${esc(added.join(', '))}. אם זה אותו אדם בשם אחר, מחקו את החדש ותקנו את השם בטבלה.</p>`:''}<div class="foot"><button class="btn primary" data-close>סגור</button></div>`);
+}
+function planPanel(){
+  const ms=planMonths(),plan=S.rotPlan||{};
+  const ppl=[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he'));
+  let h=`<div class="panel"><h2>תכנית סבבים</h2><p class="hint">איפה כל מתמחה נמצא בכל חודש. "מלר״ד" הוא אגף א, "אגף ב+ג" וכל שאר הסבבים הם רוטציה, ו"מילואים", "שלב ב", "מחקר" או "לא פעיל" הם לא זמין. כשנוצר חודש חדש, הקבוצה של כל מתמחה נקבעת לפי התכנית. שינוי כאן מעדכן גם חודש קיים שעוד לא אושר סופית. המתמחים רואים את הסבב שלהם בטופס.</p>
+  <div class="tablewrap"><table class="form"><thead><tr><th>שם</th>${ms.map(k=>`<th>${kLabel(k)}</th>`).join('')}</tr></thead><tbody>`;
+  for(const p of ppl){h+=`<tr><td><strong>${esc(p.name)}</strong></td>${ms.map(k=>{const v=(plan[p.id]||{})[k]||'';const G=planLabelToGroup(v);return`<td><input type="text" data-plan="${p.id}|${k}" value="${esc(v)}" list="planOpts" style="width:110px;${G?(G.g==='A'?'':G.g==='X'?'color:var(--muted)':'color:var(--primary)'):''}"></td>`}).join('')}</tr>`}
+  h+=`</tbody></table></div><datalist id="planOpts">${['מלר״ד','אגף ב+ג','ICU','פנימית','ילדים','אורתופדיה','כירורגיה','משפחה','מדעי היסוד','מילואים','מחקר','שלב ב','לא פעיל'].map(o=>`<option value="${o}">`).join('')}</datalist>
+  <details style="margin-top:12px"><summary style="cursor:pointer;color:var(--muted);font-size:13px">הדבקה מאקסל או מגיליון</summary><p class="hint" style="margin-top:8px">מעתיקים את הטבלה כולל שורת החודשים (שם בעמודה אחת, חודש בכל עמודה) ומדביקים כאן. בתאים ממוזגים צריך שהערך יופיע בכל חודש. תא ריק לא משנה את מה שכבר קיים.</p>
+  <textarea id="planPaste" class="msgbox" style="min-height:90px"></textarea><div class="row" style="margin-top:8px"><button class="btn" id="planGo">עדכן תכנית</button></div></details></div>`;
+  return h;
+}
 function renderPeople(){
   const ids=rosterIds();
-  let h=`<div class="panel"><h2>מתמחים החודש</h2><p class="hint">קבוצה קובעת את המכסה: אגף א מקבל ${S.settings.baseAS} משמרות ו־${S.settings.baseAD} תורנויות, סבב מקבל ${S.settings.baseRD} תורנויות. המכסה יורדת יחסית לימי החופש. ימי חופש שסומנו בלוח נספרים אוטומטית; אפשר להוסיף ימים כאן או לקבוע יעד ידני. בשורת ההעדפות: לחיצה אחת מסמנת "מעדיף", שנייה "לא רוצה", שלישית מנקה.</p>
+  let h=planPanel()+`<div class="panel"><h2>מתמחים החודש</h2><p class="hint">קבוצה קובעת את המכסה: אגף א מקבל ${S.settings.baseAS} משמרות ו־${S.settings.baseAD} תורנויות, סבב מקבל ${S.settings.baseRD} תורנויות. המכסה יורדת יחסית לימי החופש. ימי חופש שסומנו בלוח נספרים אוטומטית; אפשר להוסיף ימים כאן או לקבוע יעד ידני. בשורת ההעדפות: לחיצה אחת מסמנת "מעדיף", שנייה "לא רוצה", שלישית מנקה.</p>
   <div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>קבוצה</th><th>סבב</th><th title="משובץ לבוקר הזה בימי חול כשהוא לא אחרי תורנות">בוקר קבוע</th><th>חופש</th><th>יעד משמ׳</th><th>יעד תור׳</th><th>חותם שחרור</th>${S.types.filter(t=>t.restrict).map(t=>`<th>מאושר ל${esc(t.name)}</th>`).join('')}<th>העדפות</th><th>בקשות והערות</th><th></th></tr></thead><tbody>`;
   for(const pid of ids){
     const r=M().roster[pid], tg=targets(pid), vac=vacDays(pid);
@@ -840,7 +872,7 @@ function newMonthSheet(){
     const key=`${sh.el.querySelector('#nmY').value}-${String(sh.el.querySelector('#nmM').value).padStart(2,'0')}`;
     if(S.months[key]&&!confirm('החודש כבר קיים. לעבור אליו?'))return;
     if(!S.months[key]){const src=M().roster, roster={};for(const id in src){const r=src[id];roster[id]={...blankRoster(r.group,r.rot,'',r.order),pref:{...(r.pref||{})}}}
-      S.months[key]={roster,cells:{},dayTypes:autoTypes(key),autoHol:1,needOv:{}}}
+      S.months[key]={roster,cells:{},dayTypes:autoTypes(key),autoHol:1,needOv:{}};applyPlan(key)}
     S.cur=key;undoStack=[];$('#bUndo').disabled=true;save();sh.close();render();
   };
 }
@@ -907,7 +939,7 @@ function importXlsx(file){
       const [ky,km]=key.split('-').map(Number);
       if(S.months[key]&&!confirm(`${HEB_MONTHS[km-1]} ${ky} כבר קיים. להחליף אותו בנתוני הקובץ?`))return;
       if(S.months[key])undoStack=[];
-      S.months[key]={roster,cells,dayTypes:S.months[key]?.dayTypes||autoTypes(key),autoHol:1,needOv:{}};
+      S.months[key]={roster,cells,dayTypes:S.months[key]?.dayTypes||autoTypes(key),autoHol:1,needOv:{}};applyPlan(key);
       S.cur=key;save();tab='grid';render();
       toast(`יובאו ${Object.keys(roster).length} מתמחים ל${HEB_MONTHS[km-1]} ${ky}`+(unknown.size?`. קודים שלא זוהו: ${[...unknown].slice(0,6).join(', ')}`:''),5000);
     }catch(e){toast('הייבוא נכשל: '+e.message,5000)}
@@ -990,7 +1022,7 @@ function applyColorImport(key,people){
     roster[p.id].reqAt=Date.now();roster[p.id].reqG=g==='R'?'R':'A';if(reasons.size)roster[p.id].vacBy=[...reasons].join(', ');
     out.push({pid:p.id,name:P.name,rot:P.rot,g,vac,want});
   }
-  S.months[key]={roster,cells,dayTypes:(old&&old.dayTypes)||autoTypes(key),autoHol:1,needOv:{}};
+  S.months[key]={roster,cells,dayTypes:(old&&old.dayTypes)||autoTypes(key),autoHol:1,needOv:{}};applyPlan(key);
   const saveCur=S.cur;S.cur=key;
   for(const x of out){const g=x.g==='R'?'R':'A';const u=blockUnits(x.pid,g);x.units=u.length;x.errs=x.g==='X'?[]:checkBlocks(key,g,u).errs}
   S.cur=saveCur;return out;
@@ -1027,7 +1059,7 @@ function ensureMonth(key){
   if(S.months[key])return S.months[key];
   const src=S.months[S.cur].roster, roster={};
   for(const id in src){const r=src[id];roster[id]={...blankRoster(r.group,r.rot,'',r.order),pref:{...(r.pref||{})}}}
-  S.months[key]={roster,cells:{},dayTypes:autoTypes(key),autoHol:1,needOv:{}};
+  S.months[key]={roster,cells:{},dayTypes:autoTypes(key),autoHol:1,needOv:{}};applyPlan(key);
   return S.months[key];
 }
 function wantTypes(g){return S.types.filter(t=>t.groups.includes(g)&&(g==='A'?(t.kind==='shift'||t.kind==='duty'):t.kind==='duty'))}
@@ -1402,6 +1434,7 @@ $('#main').addEventListener('click',e=>{
   if(b.dataset.person){tab='people';render();return}
   if(b.dataset.pref){const pid=b.closest('tr').dataset.pid,r=M().roster[pid];r.pref=r.pref||{};const v=r.pref[b.dataset.pref];if(v===1)r.pref[b.dataset.pref]=-1;else if(v===-1)delete r.pref[b.dataset.pref];else r.pref[b.dataset.pref]=1;save();renderPeople();return}
   if(b.dataset.del){const pid=b.dataset.del;if(!confirm(`להסיר את ${pname(pid)} מהחודש הזה, כולל השיבוצים שלו?`))return;pushUndo();delete M().roster[pid];for(const k in M().cells)if(k.startsWith(pid+'|'))delete M().cells[k];save();renderPeople();return}
+  if(b.id==='planGo'){importPlanText($('#planPaste').value);return}
   if(b.id==='bAddP'){const id=uid();S.people.push({id,name:'מתמחה חדש'});M().roster[id]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();const inp=document.querySelector(`tr[data-pid="${id}"] input[data-f="name"]`);inp&&(inp.focus(),inp.select());return}
   if(b.id==='bCopy'){copyLuach();return}
   if(b.id==='bCal'){calSheet();return}
@@ -1423,6 +1456,8 @@ $('#main').addEventListener('click',e=>{
 $('#main').addEventListener('change',e=>{
   const el=e.target;
   const tr=el.closest('tr[data-pid]');
+  if(el.dataset.plan){const[pid,k]=el.dataset.plan.split('|');S.rotPlan=S.rotPlan||{};const v=norm(el.value);S.rotPlan[pid]=S.rotPlan[pid]||{};if(v)S.rotPlan[pid][k]=v;else delete S.rotPlan[pid][k];
+    if(S.months[k]&&v){if(S.months[k].final&&!confirm(`הלוח של ${kLabel(k)} כבר אושר סופית. לעדכן בו גם את הקבוצה?`)){save();return}applyPlan(k)}save();renderPeople();return}
   if(tr&&el.dataset.qual){const p=person(tr.dataset.pid);p.quals=p.quals||{};if(el.checked)p.quals[el.dataset.qual]=true;else delete p.quals[el.dataset.qual];save();return}
   if(tr&&el.dataset.f){const pid=tr.dataset.pid,r=M().roster[pid],f=el.dataset.f;
     if(f==='name'){person(pid).name=el.value.trim()||person(pid).name}
