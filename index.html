@@ -227,7 +227,7 @@ try{const u=new URLSearchParams(location.search).get('api');if(u&&/^https:\/\/sc
 async function sendQ(q,msg,okText){
   if(!API){showMsg(msg,okText);return}
   const sh=openSheet(`<h3>שולח…</h3><p class="sub">רגע אחד.</p>`);
-  try{const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'submit',q})});const j=await r.json();if(!j.ok)throw new Error(j.error||'שגיאה');
+  try{const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'submit',q})});const j=await r.json();if(!j.ok){if(j.error==='closed'){sh.el.innerHTML=`<h3>ההגשה ננעלה</h3><p class="sub">המועד האחרון להגשת בקשות לחודש הזה עבר.</p><div class="foot"><button class="btn primary" data-close>סגור</button></div>`;return}throw new Error(j.error||'שגיאה')}
     sh.el.innerHTML=`<h3>נשלח ✓</h3><p class="sub">${esc(okText)}</p><div class="done">הבקשה הגיעה לרכז/ת השיבוץ. אם תשנו משהו, שלחו שוב, והבקשה האחרונה היא שתיקבע.</div><div class="foot"><button class="btn primary" data-close>סגור</button></div>`;
     try{localStorage.setItem('ed-last-sent',JSON.stringify({m:q.m,type:q.type||'req',ts:Date.now()}))}catch(e){}
   }catch(e){sh.el.innerHTML=`<h3>השליחה נכשלה</h3><p class="sub">בדקו את החיבור לאינטרנט ונסו שוב.</p><div class="foot"><button class="btn primary" data-close>סגור</button></div>`}
@@ -341,7 +341,11 @@ function renderChg(){
 function persist(){try{localStorage.setItem(DKEY,JSON.stringify({...RQ,b:[...RQ.b.entries()],s:[...RQ.s],w:[...RQ.w],vac:[...RQ.vac]}))}catch(e){}}
 
 let PLAN=null;try{PLAN=JSON.parse(localStorage.getItem('ed-plan-v1')||'null')}catch(e){}
-async function fetchPlan(){if(!API)return;try{const r=await fetch(API+'?action=plan');const j=await r.json();if(j.ok&&j.plan){PLAN=j.plan;localStorage.setItem('ed-plan-v1',JSON.stringify(PLAN));const had=planFor(RQ.name,RQ.m);if(had)autoGroup();render()}}catch(e){}}
+let DEADLINES={'2026-10':'2026-09-29T09:00'};try{Object.assign(DEADLINES,JSON.parse(localStorage.getItem('ed-deadlines')||'{}'))}catch(e){}
+function dl(m){const v=DEADLINES[m];return v?new Date(v):null}
+function closed(m){const d=dl(m);return!!d&&Date.now()>d.getTime()}
+function dlText(m){const d=dl(m);return d?d.toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''}
+async function fetchPlan(){if(!API)return;try{const r=await fetch(API+'?action=plan');const j=await r.json();if(j.ok&&j.deadlines){DEADLINES={...DEADLINES,...j.deadlines};localStorage.setItem('ed-deadlines',JSON.stringify(DEADLINES))}if(j.ok&&j.plan){PLAN=j.plan;localStorage.setItem('ed-plan-v1',JSON.stringify(PLAN));const had=planFor(RQ.name,RQ.m);if(had)autoGroup();render()}}catch(e){}}
 function planRow(name){if(!PLAN)return null;const c=x=>norm(x).replace(/["'׳״`]/g,'');const n=c(name);if(!n)return null;const k=Object.keys(PLAN).find(x=>c(x)===n);return k?PLAN[k]:null}
 function planFor(name,m){const r=planRow(name);return r?r[m]||'':''}
 function planGroup(l){if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return'A';if(/מילואים/.test(l))return'M';if(/שלב\s*ב|לא\s*פעיל|חל.?ד|חופשת\s*לידה/.test(l))return'X';return'R'}
@@ -360,6 +364,7 @@ function render(){
   <li>מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות.</li>
   <li>מילואים, קורס וחופשה שאושרה מראש מסמנים בנפרד, במצב "חופשה / מילואים", עם שם מי שאישר. היא לא נספרת בחסימות, ומספר המשמרות והתורנויות יורד לפי החלק היחסי של החודש.</li>
   <li>אחרי שהלוח מפורסם, כל החלפה או שינוי צריכים אישור של רכז/ת השיבוץ. עושים את זה בלשונית "בקשת החלפה".</li></ul></div>
+  ${closed(RQ.m)?`<div class="rules" style="background:var(--danger-bg);color:var(--danger);font-weight:600">ההגשה ל${kLabel(RQ.m)} ננעלה ב־${dlText(RQ.m)}. לשינוי אחרי הנעילה, פנו לרכז/ת השיבוץ או שלחו בקשת החלפה אחרי פרסום הלוח.</div>`:dl(RQ.m)?`<div class="rules"><strong>מועד אחרון להגשה ל${kLabel(RQ.m)}: ${dlText(RQ.m)}</strong>אחרי המועד המערכת ננעלת. עד אז אפשר לשנות ולשלוח שוב, והבקשה האחרונה קובעת.</div>`:''}
   ${planLine()}
   <div class="fields">
     <label>שם<input type="text" id="rqName" list="rqNames" value="${esc(RQ.name)}" autocomplete="off" placeholder="השם שלך"></label>
@@ -387,7 +392,7 @@ function render(){
     h+=`<button class="${cls}" data-rqday="${d}" title="${esc(hd?hd.name:'')}" aria-label="${d} ב${kLabel(key)}${hd?', '+hd.name:''}${lab?', '+lab:''}"><span class="num">${d}</span><small>${esc(lab)}</small></button>`;
   }
   h+=`</div><label style="display:block;font-size:13px;color:var(--muted);margin-bottom:4px" for="rqNotes">בקשות נוספות והערות</label><textarea id="rqNotes" placeholder="למשל: מעדיף לילות">${esc(RQ.t)}</textarea>
-  <div class="row" style="margin-top:12px"><button class="btn primary" id="rqSend">${API?'שלח בקשה':'הכן הודעה לשליחה'}</button><button class="btn" id="rqReset">נקה את הלוח</button></div></div>`;
+  <div class="row" style="margin-top:12px"><button class="btn primary" id="rqSend" ${closed(RQ.m)?'disabled':''}>${API?'שלח בקשה':'הכן הודעה לשליחה'}</button><button class="btn" id="rqReset">נקה את הלוח</button></div></div>`;
   $('#main').innerHTML=h;
 }
 function quota(){const f=Math.max(0,1-RQ.vac.size/kDim(RQ.m));return RQ.g==='A'?`מכסה משוערת: ${Math.round(BASE.AS*f)} משמרות ו־${Math.round(BASE.AD*f)} תורנויות`:`מכסה משוערת: ${Math.round(BASE.RD*f)} תורנויות`}
@@ -444,6 +449,7 @@ document.addEventListener('click',e=>{
     persist();render();return}
   if(b.id==='rqReset'){if(!confirm('לנקות את כל הסימונים?'))return;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();persist();render();return}
   if(b.id==='rqSend'){
+    if(closed(RQ.m)){toast('ההגשה לחודש הזה ננעלה');return}
     if(!norm(RQ.name)){toast('כתבו את השם שלכם');$('#rqName').focus();return}
     if(RQ.vac.size&&RQ.vre==='חופשה'&&!norm(RQ.vby)){toast('כתבו מי אישר את החופשה');return}
     const chk=checkBlocks(RQ.m,RQ.g,units());if(chk.errs.length){ruleModal('הבקשה חורגת מהכללים',[...chk.errs,'תקנו את החסימות בלוח ונסו שוב.']);return}
