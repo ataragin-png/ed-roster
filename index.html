@@ -340,6 +340,14 @@ function renderChg(){
 }
 function persist(){try{localStorage.setItem(DKEY,JSON.stringify({...RQ,b:[...RQ.b.entries()],s:[...RQ.s],w:[...RQ.w],vac:[...RQ.vac]}))}catch(e){}}
 
+let PLAN=null;try{PLAN=JSON.parse(localStorage.getItem('ed-plan-v1')||'null')}catch(e){}
+async function fetchPlan(){if(!API)return;try{const r=await fetch(API+'?action=plan');const j=await r.json();if(j.ok&&j.plan){PLAN=j.plan;localStorage.setItem('ed-plan-v1',JSON.stringify(PLAN));const had=planFor(RQ.name,RQ.m);if(had)autoGroup();render()}}catch(e){}}
+function planRow(name){if(!PLAN)return null;const c=x=>norm(x).replace(/["'׳״`]/g,'');const n=c(name);if(!n)return null;const k=Object.keys(PLAN).find(x=>c(x)===n);return k?PLAN[k]:null}
+function planFor(name,m){const r=planRow(name);return r?r[m]||'':''}
+function planGroup(l){if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return'A';if(/מילואים|שלב\s*ב|מחקר|לא\s*פעיל|חל.?ד|חופשת\s*לידה/.test(l))return'X';return'R'}
+function autoGroup(){const l=planFor(RQ.name,RQ.m),g=planGroup(l);if(g==='A'){RQ.g='A';RQ.rot=''}else if(g==='R'){RQ.g='R';RQ.rot=l}persist()}
+function planLine(){const row=planRow(RQ.name);if(!row)return'';const ks=monthOpts();const cur=row[RQ.m]||'';const g=planGroup(cur);
+  return`<div class="rules" style="background:var(--ok-bg)"><strong>הסבב שלך לפי התכנית</strong>${ks.filter(k=>row[k]).map(k=>`${kLabel(k)}: ${esc(row[k])}${planGroup(row[k])==='A'?' (אגף א)':''}`).join(' · ')||'אין עדיין'}${g==='X'?`<div style="color:var(--warn);font-weight:600;margin-top:4px">ב${kLabel(RQ.m)} אתה רשום כ"${esc(cur)}", ולכן לא תשובץ. אם זה לא נכון, פנה לרכז/ת השיבוץ.</div>`:''}</div>`}
 function render(){
   if(VIEW==='chg')return renderChg();
   if(VIEW==='cal')return renderCal();
@@ -352,6 +360,7 @@ function render(){
   <li>מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות.</li>
   <li>חופשה שאושרה מראש מסמנים בנפרד, עם שם מי שאישר. היא לא נספרת בחסימות, ומספר המשמרות והתורנויות יורד לפי החלק היחסי של החודש.</li>
   <li>אחרי שהלוח מפורסם, כל החלפה או שינוי צריכים אישור של רכז/ת השיבוץ. עושים את זה בלשונית "בקשת החלפה".</li></ul></div>
+  ${planLine()}
   <div class="fields">
     <label>שם<input type="text" id="rqName" list="rqNames" value="${esc(RQ.name)}" autocomplete="off" placeholder="השם שלך"></label>
     <datalist id="rqNames">${NAMES.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
@@ -443,12 +452,15 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('input',e=>{const id=e.target.id;if(id==='chN'){RQ.name=e.target.value;persist();return}if(id==='chW'){CH.w=e.target.value;return}if(id==='chT'){CH.t=e.target.value;return}if(id==='rqNotes')RQ.t=e.target.value;else if(id==='rqRot')RQ.rot=e.target.value;else if(id==='rqName')RQ.name=e.target.value;else if(id==='rqVby')RQ.vby=e.target.value;else return;persist()});
 document.addEventListener('change',e=>{const id=e.target.id;
-  if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();persist();render()}
+  if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();autoGroup();persist();render()}
+  else if(id==='rqName'){RQ.name=e.target.value;if(planRow(RQ.name))autoGroup();persist();render()}
   else if(id==='rqWcode'){RQ.wcode=e.target.value;persist()}
   else if(id==='calName'){RQ.name=e.target.value;persist();render()}
   else if(id==='chM'){CH.m=e.target.value;CH.d1='';CH.d2='';render()}
   else if(id==='chD1')CH.d1=e.target.value;else if(id==='chC1')CH.c1=e.target.value;else if(id==='chD2')CH.d2=e.target.value;else if(id==='chC2')CH.c2=e.target.value;else if(id==='chAgree')CH.agree=e.target.checked});
+if(planRow(RQ.name))autoGroup();
 render();
+fetchPlan();
 </script>
 </body>
 </html>
