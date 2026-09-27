@@ -676,7 +676,7 @@ function renderGrid(){
   $('#main').innerHTML=h;
 }
 
-function planLabelToGroup(l){l=norm(l);if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return{g:'A',rot:'אגף א'};if(/מילואים|שלב\s*ב|מחקר|לא\s*פעיל|חל.?ד|חופשת\s*לידה/.test(l))return{g:'X',rot:l};return{g:'R',rot:l}}
+function planLabelToGroup(l){l=norm(l);if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return{g:'A',rot:'אגף א'};if(/מילואים|שלב\s*ב|לא\s*פעיל|חל.?ד|חופשת\s*לידה/.test(l))return{g:'X',rot:l};return{g:'R',rot:l}}
 function applyPlan(key){const mo=S.months[key];if(!mo||!S.rotPlan)return 0;let n=0;
   for(const pid in S.rotPlan){const G=planLabelToGroup((S.rotPlan[pid]||{})[key]);if(!G||!person(pid))continue;let r=mo.roster[pid];
     if(!r){mo.roster[pid]=blankRoster(G.g,G.rot,'',Object.keys(mo.roster).length+1);n++;continue}
@@ -700,7 +700,7 @@ function importPlanText(txt){
 function planPanel(){
   const ms=planMonths(),plan=S.rotPlan||{};
   const ppl=[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he'));
-  let h=`<div class="panel"><h2>תכנית סבבים</h2><p class="hint">איפה כל מתמחה נמצא בכל חודש. "מלר״ד" הוא אגף א, "אגף ב+ג" וכל שאר הסבבים הם רוטציה, ו"מילואים", "שלב ב", "מחקר" או "לא פעיל" הם לא זמין. כשנוצר חודש חדש, הקבוצה של כל מתמחה נקבעת לפי התכנית. שינוי כאן מעדכן גם חודש קיים שעוד לא אושר סופית. המתמחים רואים את הסבב שלהם בטופס.</p>
+  let h=`<div class="panel"><h2>תכנית סבבים</h2><p class="hint">איפה כל מתמחה נמצא בכל חודש. "מלר״ד" הוא אגף א, "אגף ב+ג" וכל שאר הסבבים הם רוטציה, ו"מחקר" הוא רוטציה (6 תורנויות), "מילואים" נחשב כמו חופשה (מי שבמילואים רק בחלק מהחודש מסמן את הימים בטופס ומשובץ בשאר), ו"שלב ב" או "לא פעיל" הם לא זמין. כשנוצר חודש חדש, הקבוצה של כל מתמחה נקבעת לפי התכנית. שינוי כאן מעדכן גם חודש קיים שעוד לא אושר סופית. המתמחים רואים את הסבב שלהם בטופס.</p>
   <div class="tablewrap"><table class="form"><thead><tr><th>שם</th>${ms.map(k=>`<th>${kLabel(k)}</th>`).join('')}</tr></thead><tbody>`;
   for(const p of ppl){h+=`<tr><td><strong>${esc(p.name)}</strong></td>${ms.map(k=>{const v=(plan[p.id]||{})[k]||'';const G=planLabelToGroup(v);return`<td><input type="text" data-plan="${p.id}|${k}" value="${esc(v)}" list="planOpts" style="width:110px;${G?(G.g==='A'?'':G.g==='X'?'color:var(--muted)':'color:var(--primary)'):''}"></td>`}).join('')}</tr>`}
   h+=`</tbody></table></div><datalist id="planOpts">${['מלר״ד','אגף ב+ג','ICU','פנימית','ילדים','אורתופדיה','כירורגיה','משפחה','מדעי היסוד','מילואים','מחקר','שלב ב','לא פעיל'].map(o=>`<option value="${o}">`).join('')}</datalist>
@@ -1142,6 +1142,7 @@ function applyRequest(q){
   if(!p){p={id:uid(),name:norm(q.n)};S.people.push(p);isNew=true}
   if(!mo.roster[p.id])mo.roster[p.id]=blankRoster(q.g,q.g==='A'?'אגף א':(q.r||''),'',Object.keys(mo.roster).length+1);
   const r=mo.roster[p.id];
+  if(r.group==='X'&&/מילואים/.test(r.rot||'')&&(q.g==='A'||q.g==='R')){r.group=q.g;r.rot=q.g==='A'?'אגף א':(q.r||'')}
   if(r.group==='R'&&!r.rot&&q.r)r.rot=q.r;
   r.notes=q.t||''; r.reqAt=q.ts||Date.now(); r.reqG=q.g;
   const N=kDim(q.m);
@@ -1224,7 +1225,7 @@ function ingestQs(list,bad=0){
   if(!queued.length&&months.length===1&&months[0]!==S.cur){S.cur=months[0];undoStack=[];$('#bUndo').disabled=true;save()}
   render();
   let html=`<h3>נקלטו ${applied.length+queued.length} בקשות</h3>`;
-  if(applied.length)html+=`<h4>נכנסו ישר ללוח</h4><ul class="issues" style="padding-right:18px">${applied.map(x=>{const c=checkBlocks(x.q.m,x.q.g,x.q.bu||x.q.b);return`<li class="${c.errs.length?'err':''}">${esc(x.p.name)} (${kLabel(x.q.m)}): ${(x.q.bu||x.q.b).length} חסימות${x.q.vac&&x.q.vac.length?`, <b>${x.q.vac.length} ימי חופשה מאושרת (אישר: ${esc(x.q.vby||'לא צוין')})</b>`:''}${x.isNew?', מתמחה חדש נוסף לרשימה':''}${x.mismatch?', הגיש בקבוצה אחרת מזו שבלוח':''}${c.errs.length?', '+esc(c.errs.join(', ')):''}</li>`}).join('')}</ul>`;
+  if(applied.length)html+=`<h4>נכנסו ישר ללוח</h4><ul class="issues" style="padding-right:18px">${applied.map(x=>{const c=checkBlocks(x.q.m,x.q.g,x.q.bu||x.q.b);return`<li class="${c.errs.length?'err':''}">${esc(x.p.name)} (${kLabel(x.q.m)}): ${(x.q.bu||x.q.b).length} חסימות${x.q.vac&&x.q.vac.length?`, <b>${x.q.vac.length} ימי ${x.q.vre&&x.q.vre!=='חופשה'?esc(x.q.vre):`חופשה מאושרת (אישר: ${esc(x.q.vby||'לא צוין')})`}</b>`:''}${x.isNew?', מתמחה חדש נוסף לרשימה':''}${x.mismatch?', הגיש בקבוצה אחרת מזו שבלוח':''}${c.errs.length?', '+esc(c.errs.join(', ')):''}</li>`}).join('')}</ul>`;
   if(queued.length)html+=`<h4>ממתינים לאישור שלך</h4><ul class="issues" style="padding-right:18px">${queued.map(q=>`<li>${esc(q.n)}: ${q.type==='chg'?(q.kind==='swap'?'בקשת החלפה':'בקשה למסור משמרת'):'בקשה ללוח שכבר נסגר'}</li>`).join('')}</ul>`;
   if(bad)html+=`<p class="errs">${bad} בקשות פגומות לא נקלטו</p>`;
   openSheet(html+`<div class="foot"><button class="btn primary" data-close>סגור</button></div>`);
@@ -1267,7 +1268,7 @@ function pendingCard(q,i){
   return`<div class="panel" style="margin-bottom:10px;padding:12px 14px"><div class="row" style="justify-content:space-between"><div><strong style="font-size:15px">${esc(q.n)}</strong> <span style="color:var(--muted);font-size:13px">בקשות ל${kLabel(q.m)}, ${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+esc(q.r):'')}, נשלח ${q.ts?new Date(q.ts).toLocaleDateString('he-IL'):''}</span></div>
   <div class="row"><button class="btn small primary" data-approve="${i}">אשר</button><button class="btn small danger" data-reject="${i}">דחה</button></div></div>
   <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p[1]==='day'?'יום':p[1]==='duty'?'תורנות':'לילה'):''})`}).join(', '))||'אין'}</div>
-  ${q.vac&&q.vac.length?`<div><b>חופשה מאושרת (אישר: ${esc(q.vby||'לא צוין')}):</b> ${esc(dl(q.vac))}</div>`:''}
+  ${q.vac&&q.vac.length?`<div><b>${q.vre&&q.vre!=='חופשה'?esc(q.vre):`חופשה מאושרת (אישר: ${esc(q.vby||'לא צוין')})`}:</b> ${esc(dl(q.vac))}</div>`:''}
   ${q.s.length?`<div><b>מעדיף שלא:</b> ${esc(dl(q.s))}</div>`:''}
   ${q.w.length?`<div><b>רוצה לעבוד:</b> ${esc(q.w.map(([d,c])=>c?`${d} (${typeBy(c)?.name||c})`:String(d)).join(', '))}</div>`:''}
   ${q.t?`<div><b>הערות:</b> ${esc(q.t)}</div>`:''}
