@@ -308,6 +308,7 @@ let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){S=null}
 if(!S||S.v!==1||!S.months||!S.months[S.cur]) S=seedState();
 if(!S.settings.req)S.settings.req={...REQ_DEFAULT};
+if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:00'};
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
@@ -1180,7 +1181,7 @@ function renderInbox(){
   <details style="margin-top:12px"${apiOn()?'':' open'}><summary style="cursor:pointer;color:var(--muted);font-size:13px">הדבקה ידנית של הודעות (#REQ / #CHG)</summary>
   <textarea id="inPaste" class="msgbox" style="min-height:90px;margin-top:8px" placeholder="הדביקו הודעות שמכילות #REQ: או #CHG:"></textarea>
   <div class="row" style="margin-top:8px"><button class="btn" id="inGo">קלוט הודעות</button>${apiOn()?'':'<button class="btn" id="inRemind">הודעת תזכורת לקבוצה</button>'}</div></details></div>`;
-  h+=`<div class="row" style="justify-content:space-between;margin:4px 0 8px"><h2 style="font-size:16px;margin:0">ממתינים לאישור שלך (${S.pending.length})</h2></div>`;
+  h+=`<div class="row" style="justify-content:space-between;margin:4px 0 8px"><label style="font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center">מועד אחרון להגשה ל${kLabel(S.cur)}<input type="datetime-local" id="dlInput" value="${esc((S.settings.req.deadlines||{})[S.cur]||'')}" style="background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:4px"></label></div><div class="row" style="justify-content:space-between;margin:4px 0 8px"><h2 style="font-size:16px;margin:0">ממתינים לאישור שלך (${S.pending.length})</h2></div>`;
   h+=S.pending.length?S.pending.map((q,i)=>q.type==='chg'?chgCard(q,i):pendingCard(q,i)).join(''):`<p class="hint" style="color:var(--muted);margin:0 0 16px">אין בקשות שממתינות לאישור.</p>`;
   const log=(M().log||[]).slice(-15).reverse();
   if(log.length)h+=`<div class="panel"><h2>שינויים אחרי סגירת הלוח</h2><ul class="issues" style="padding-right:18px">${log.map(l=>`<li>${new Date(l.ts).toLocaleDateString('he-IL')}: ${esc(l.text)}</li>`).join('')}</ul></div>`;
@@ -1470,6 +1471,7 @@ $('#main').addEventListener('change',e=>{
     else r[f]=el.value;
     save();if(f==='group'||f==='extraVac'||f==='tS'||f==='tD')renderPeople();return}
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
+  if(el.id==='dlInput'){S.settings.req.deadlines=S.settings.req.deadlines||{};if(el.value)S.settings.req.deadlines[S.cur]=el.value;else delete S.settings.req.deadlines[S.cur];save();toast(el.value?'המועד נשמר. אחריו הטופס ננעל':'המועד בוטל');return}
   if(el.dataset.rs==='apiUrl'||el.dataset.rs==='apiKey'){const had=S.savedAt;S.settings[el.dataset.rs]=el.value.trim();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(S.settings.apiUrl&&S.settings.apiKey)loadFromServer();return}
   if(el.dataset.rs==='formUrl'){S.settings.formUrl=el.value.trim();save();return}
   if(el.dataset.rs){const k=el.dataset.rs;S.settings.req[k]=k==='deadline'?el.value.trim():(Number(el.value)||0);save();return}
