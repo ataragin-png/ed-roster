@@ -443,6 +443,7 @@ function analyze(){
         if(r.group==='X')add(pid,d,'warn','המתמחה מסומן כלא זמין החודש');
         else if(!t.groups.includes(r.group))add(pid,d,'warn',`${t.name} לא מיועד ל${GROUPS[r.group]}`);
       }
+      if(r.group==='A'&&cl.c.includes('mc')&&cl.c.includes('nc')){cnt.shift-=2;cnt.duty++}
       if(r.group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
       if(cl.c.length&&cl.mk==='vac')add(pid,d,'err','שובץ ביום חופש');
       for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d,typeBy(code));if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
@@ -478,6 +479,7 @@ function buildCtx(){
   for(const pid of rosterIds()){
     ctx.iv[pid]=[];ctx.cnt[pid]={shift:0,duty:0,day:0,other:0,wk:0,mo:0,ni:0};ctx.frac[pid]=availFrac(pid);ctx.tgt[pid]=targets(pid);ctx.days[pid]=new Set();
     for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);for(const code of cl.c){const t=typeBy(code);if(!t)continue;{const x=iv(code,d);ctx.iv[pid].push({d,...x,ni:isNight(t)});if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x})}ctx.cnt[pid][t.kind]++;if(isMorn(t))ctx.cnt[pid].mo++;if(isNight(t))ctx.cnt[pid].ni++;ctx.days[pid].add(d)}
+      if(M().roster[pid].group==='A'&&cl.c.includes('mc')&&cl.c.includes('nc')){ctx.cnt[pid].shift-=2;ctx.cnt[pid].duty++}
       if(M().roster[pid].group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){ctx.cnt[pid].shift-=sh;ctx.cnt[pid].duty++}}
       if(cl.c.length&&isWeekend(d))ctx.cnt[pid].wk++}
     const g=ctx.gs[M().roster[pid].group],c=ctx.cnt[pid];g.mo+=c.mo;g.ni+=c.ni;g.wk+=c.wk;g.f+=ctx.frac[pid];
@@ -522,6 +524,24 @@ function evaluate(pid,t,d,ctx){
 }
 function commit(ctx,pid,t,d){const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.iv[pid].push({d,...x,ni:isNight(t)});if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x});c[t.kind]++;if(isMorn(t)){c.mo++;G.mo++}if(isNight(t)){c.ni++;G.ni++}if(isWeekend(d)&&!ctx.days[pid].has(d)){c.wk++;G.wk++}ctx.days[pid].add(d)}
 
+function uncommit(ctx,pid,t,d){const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];
+  const i=ctx.iv[pid].findIndex(y=>y.d===d&&y.s===x.s&&y.e===x.e);if(i>=0)ctx.iv[pid].splice(i,1);c[t.kind]--;if(isMorn(t)){c.mo--;G.mo--}if(isNight(t)){c.ni--;G.ni--}
+  if(t.loc&&ctx.occ[t.loc]){const j=ctx.occ[t.loc].findIndex(y=>y.pid===pid&&y.s===x.s);if(j>=0)ctx.occ[t.loc].splice(j,1)}
+  if(!ctx.iv[pid].some(y=>y.d===d)){ctx.days[pid].delete(d);if(isWeekend(d)){c.wk--;G.wk--}}}
+function can24(pid,d,ctx,mcT,ncT,ignorePid){
+  const r=M().roster[pid],st=S.settings;if(!r||(r.group!=='A'&&r.group!=='R'))return null;
+  if(!mcT.groups.includes(r.group)||!ncT.groups.includes(r.group)||!qualified(pid,mcT)||!qualified(pid,ncT))return null;
+  const cl=cellOf(pid,d);if(cl.mk==='vac')return null;
+  const a=iv('mc',d),b=iv('nc',d);if(blockHit(pid,a,d,mcT)||blockHit(pid,b,d,ncT))return null;
+  if(ctx.days[pid].has(d))return null;
+  for(const y of ctx.iv[pid]){const gap=a.s>=y.e?a.s-y.e:y.s-b.e;if(gap<st.minRest*60)return null}
+  if(b.e-a.s>st.maxCont*60)return null;
+  for(const[t,x] of [[mcT,a],[ncT,b]])if(t.loc&&(ctx.occ[t.loc]||[]).some(y=>y.pid!==pid&&y.pid!==ignorePid&&x.s<y.e&&y.s<x.e))return null;
+  if(sigReqOn(ncT,d)&&!isSigner(pid))return null;
+  const c=ctx.cnt[pid],tg=ctx.tgt[pid];if(c.duty>=tg.D)return null;
+  let sc=10*(tg.D-c.duty)/Math.max(tg.D,1)+Math.random()*2;const p=(r.pref||{});if(p.mc===1||p.nc===1)sc+=4;if(p.mc===-1||p.nc===-1)sc-=8;
+  if(cl.mk==='soft')sc-=8;if(cl.mk==='want'&&(!cl.wc||cl.wc==='@duty'||cl.wc==='mc'||cl.wc==='nc'))sc+=6;
+  if(r.group==='A')sc-=1;return sc}
 function autofill(){
   const N=dim(), ids=rosterIds(), sigs=new Set(ids.filter(isSigner));
   const slots=[];
@@ -535,7 +555,7 @@ function autofill(){
       if(sc>ts){ts=sc;top=pid}}return{top,topSig}};
   let best=null;
   for(let trial=0;trial<140;trial++){
-    const ctx=buildCtx(); const picks=[]; let unfilled=0;
+    const ctx=buildCtx(); const picks=[]; let unfilled=0; const left=[];
     const has=new Set();for(let d=1;d<=N;d++)for(const t of S.types)if(filled(t.code,d).length)has.add(t.code+'|'+d);
     const put=(pid,t,d)=>{commit(ctx,pid,t,d);picks.push({pid,d,code:t.code});has.add(t.code+'|'+d);if(t.signer&&sigs.has(pid))covered.add(d)};
     const covered=new Set(), remSig={};for(let d=1;d<=N;d++)if(!sigDay(d)||signersOn(d).length)covered.add(d);
@@ -546,7 +566,21 @@ function autofill(){
       const needSig=s.t.signer&&!covered.has(s.d);
       let{top,topSig}=pickBest(s.t,s.d,ctx,needSig);
       if(needSig){remSig[s.d]--;if(remSig[s.d]<=0&&topSig)top=topSig}
-      if(top)put(top,s.t,s.d);else unfilled++;
+      if(top)put(top,s.t,s.d);else{unfilled++;left.push(s)}
+    }
+    // שלב 1ב: בוקר מהלכים כירורגיה שנשאר ריק הופך ל־24 שעות (בוקר+ערב) כתורנות
+    const mcT=typeBy('mc'),ncT=typeBy('nc');
+    if(mcT&&ncT&&S.settings.surg24!==false){
+      for(const s of left.filter(x=>x.t.code==='mc').sort(()=>Math.random()-.5)){
+        const d=s.d;if(has.has('mc|'+d))continue;
+        const ncPick=picks.find(p=>p.d===d&&p.code==='nc');const ncManual=!ncPick&&filled('nc',d).length;if(ncManual)continue;
+        let bestP=null,bs=-1e9;for(const pid of ids){const sc=can24(pid,d,ctx,mcT,ncT,ncPick&&ncPick.pid);if(sc!==null&&sc>bs){bs=sc;bestP=pid}}
+        if(!bestP)continue;
+        if(ncPick){uncommit(ctx,ncPick.pid,ncT,d);picks.splice(picks.indexOf(ncPick),1)}
+        put(bestP,mcT,d);put(bestP,ncT,d);ctx.cnt[bestP].shift-=2;ctx.cnt[bestP].duty++;unfilled--;left.splice(left.indexOf(s),1);
+      }
+      // ניסיון חוזר למשבצות שנשארו ריקות, עם מי שהתפנה
+      for(const s of [...left]){if(has.has(s.t.code+'|'+s.d))continue;const{top}=pickBest(s.t,s.d,ctx,false);if(top){put(top,s.t,s.d);unfilled--;left.splice(left.indexOf(s),1)}}
     }
     // שלב 2: מכסת פנימית
     let intN=intHave;
@@ -782,9 +816,10 @@ function renderSettings(){
   <label>תורנויות בסבב<input type="number" data-s="baseRD" value="${st.baseRD}"></label>
   <label>מנוחה מינימלית (שעות)<input type="number" data-s="minRest" value="${st.minRest}"></label>
   <label>רצף מקסימלי (שעות)<input type="number" data-s="maxCont" value="${st.maxCont}"></label>
-  <label>מינימום תורנויות פנימית בחודש<input type="number" data-s="intMin" value="${st.intMin??15}"></label></div>
+  <label>מינימום תורנויות פנימית בחודש<input type="number" data-s="intMin" value="${st.intMin??15}"></label>
+  <label style="flex-direction:row;align-items:center;gap:6px;max-width:320px"><input type="checkbox" id="surg24" ${st.surg24===false?'':'checked'} style="width:auto"> כשחסר בוקר מהלכים כירורגיה, לשבץ 24 שעות (בוקר+ערב) כתורנות</label></div>
   <p class="hint" style="margin-top:12px">סדר המילוי האוטומטי: קודם משבצות החובה בכל יום (אגף א, צד ב, מהלכים לילה ומה שמסומן בימים), אחר כך מכסת הפנימית (צד ג ומהלכים פנימית), אחר כך השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה או ילדים (רק למאושרים), ובסוף, למתמחי אגף א שעדיין חסרות להם משמרות (לא בגלל חופשה), בוקר אורתופדיה או מד״א בימי חול. בוקר מהלכים כירורגיה הוא משבצת חובה בראשון עד חמישי, אבל מאויש אחרון מבין משבצות החובה, כך שאם חסרים אנשים, החוסר נופל עליו ולא על אגף א.</p></div>`;
-  h+=`<div class="panel"><h2>סוגי משמרות</h2><p class="hint">הקודים זהים לקודים בגיליון הבקשות. בכל מקום יכול לעבוד רק אדם אחד בכל רגע, לכן משמרות שחופפות בזמן ובמקום לא ישובצו לשני אנשים. מתמחה ברוטציה שעושה בוקר וערב מהלכים כירורגיה באותו יום (24 שעות) נספר כתורנות אחת. סמנו לאיזו קבוצה כל משמרת מתאימה, באילו משמרות חותם שחרור מכסה את הלילה, ובאילו ימים היא נדרשת (ערב חג נחשב כשישי, חג נחשב כשבת). אפשר גם להדליק או לכבות דרישה ליום בודד מלחיצה על שורת הכיסוי בלוח.</p><div class="tablewrap"><table class="form"><thead><tr><th>קוד</th><th>שם</th><th>קיצור</th><th title="בכל מקום יכול להיות רק אדם אחד בכל רגע. ריק = ללא הגבלה">מקום</th><th>סוג</th><th>משעה</th><th>עד</th><th>אגף א</th><th>סבב</th><th title="חותם שחרור במשמרת הזו מכסה את הלילה">חותם בלילה</th><th title="נספר במכסת הפנימית החודשית">פנימית</th><th title="בפנימית: חותם שחרור ישובץ עדיף כאן">פנימית לחותמים</th><th title="משלים משמרות למתמחי אגף א שלא הגיעו למכסה">משלים לאגף א</th><th title="משובץ בשלב ההשלמה, אחרי החובה והפנימית">השלמה</th><th title="רק מתמחים מאושרים יכולים להיות משובצים">דורש אישור</th><th>נדרש בימים</th><th title="בימים המסומנים רק חותם שחרור יכול לקבל את המשמרת">חותם חובה בימים</th><th>צבע</th><th></th></tr></thead><tbody>`;
+  h+=`<div class="panel"><h2>סוגי משמרות</h2><p class="hint">הקודים זהים לקודים בגיליון הבקשות. בכל מקום יכול לעבוד רק אדם אחד בכל רגע, לכן משמרות שחופפות בזמן ובמקום לא ישובצו לשני אנשים. מתמחה שעושה בוקר וערב מהלכים כירורגיה באותו יום (24 שעות), ברוטציה או באגף א, נספר לו כתורנות אחת. סמנו לאיזו קבוצה כל משמרת מתאימה, באילו משמרות חותם שחרור מכסה את הלילה, ובאילו ימים היא נדרשת (ערב חג נחשב כשישי, חג נחשב כשבת). אפשר גם להדליק או לכבות דרישה ליום בודד מלחיצה על שורת הכיסוי בלוח.</p><div class="tablewrap"><table class="form"><thead><tr><th>קוד</th><th>שם</th><th>קיצור</th><th title="בכל מקום יכול להיות רק אדם אחד בכל רגע. ריק = ללא הגבלה">מקום</th><th>סוג</th><th>משעה</th><th>עד</th><th>אגף א</th><th>סבב</th><th title="חותם שחרור במשמרת הזו מכסה את הלילה">חותם בלילה</th><th title="נספר במכסת הפנימית החודשית">פנימית</th><th title="בפנימית: חותם שחרור ישובץ עדיף כאן">פנימית לחותמים</th><th title="משלים משמרות למתמחי אגף א שלא הגיעו למכסה">משלים לאגף א</th><th title="משובץ בשלב ההשלמה, אחרי החובה והפנימית">השלמה</th><th title="רק מתמחים מאושרים יכולים להיות משובצים">דורש אישור</th><th>נדרש בימים</th><th title="בימים המסומנים רק חותם שחרור יכול לקבל את המשמרת">חותם חובה בימים</th><th>צבע</th><th></th></tr></thead><tbody>`;
   S.types.forEach((t,i)=>{
     h+=`<tr data-ti="${i}"><td><input type="text" class="w-short" data-tf="code" value="${esc(t.code)}" dir="ltr"></td>
     <td><input type="text" class="w-name" data-tf="name" value="${esc(t.name)}"></td>
@@ -1500,6 +1535,7 @@ $('#main').addEventListener('change',e=>{
     else if(f==='home'){r.home=el.value}
     else r[f]=el.value;
     save();if(f==='group'||f==='extraVac'||f==='tS'||f==='tD')renderPeople();return}
+  if(el.id==='surg24'){S.settings.surg24=el.checked;save();return}
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
   if(el.id==='dlInput'){S.settings.req.deadlines=S.settings.req.deadlines||{};if(el.value)S.settings.req.deadlines[S.cur]=el.value;else delete S.settings.req.deadlines[S.cur];save();toast(el.value?'המועד נשמר. אחריו הטופס ננעל':'המועד בוטל');return}
   if(el.dataset.rs==='apiUrl'||el.dataset.rs==='apiKey'){const had=S.savedAt;S.settings[el.dataset.rs]=el.value.trim();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(S.settings.apiUrl&&S.settings.apiKey)loadFromServer();return}
