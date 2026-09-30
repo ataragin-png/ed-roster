@@ -325,13 +325,13 @@ function renderChg(){
   const key=CH.m;
   let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>החלפות אחרי פרסום הלוח</strong><ul><li>אפשר להתחלף עם מתמחה אחר, או למסור לו משמרת.</li><li>קודם מסכמים עם המתמחה השני, ואז שולחים את הבקשה.</li><li>השינוי נכנס ללוח רק אחרי אישור רכז/ת השיבוץ.</li></ul></div>
   <div class="fields">
-    <label>השם שלי<input type="text" id="chN" list="rqNames" value="${esc(RQ.name)}" autocomplete="off" placeholder="השם שלך"></label>
+    <label>השם שלי${nameSel('chN',RQ.name,'בחרו את השם שלכם')}</label>
     <datalist id="rqNames">${NAMES.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
     <label>חודש<select id="chM">${monthOpts().slice(0,2).map(k=>`<option value="${k}" ${k===key?'selected':''}>${kLabel(k)}</option>`).join('')}</select></label>
     <label>סוג הבקשה<span class="seg"><button data-chk="swap" aria-pressed="${CH.kind==='swap'}">החלפה</button><button data-chk="give" aria-pressed="${CH.kind==='give'}">מסירת משמרת</button></span></label>
   </div>
   <div class="fields"><label>המשמרת שלי${dateSel('chD1',CH.d1,key)}</label><label>&nbsp;${shiftSel('chC1',CH.c1)}</label></div>
-  <div class="fields"><label>${CH.kind==='swap'?'מתחלף עם':'מוסר ל'}<input type="text" id="chW" list="rqNames" value="${esc(CH.w)}" autocomplete="off" placeholder="שם המתמחה"></label></div>
+  <div class="fields"><label>${CH.kind==='swap'?'מתחלף עם':'מוסר ל'}${nameSel('chW',CH.w,'בחרו מתמחה')}</label></div>
   ${CH.kind==='swap'?`<div class="fields"><label>המשמרת שלו/שלה שאני לוקח/ת${dateSel('chD2',CH.d2,key)}</label><label>&nbsp;${shiftSel('chC2',CH.c2)}</label></div>`:''}
   <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0 12px"><input type="checkbox" id="chAgree" ${CH.agree?'checked':''}> המתמחה השני מסכים לשינוי</label>
   <label style="display:block;font-size:13px;color:var(--muted);margin-bottom:4px" for="chT">הערה</label><textarea id="chT">${esc(CH.t)}</textarea>
@@ -352,7 +352,10 @@ function planGroup(l){if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/�
 function autoGroup(){const l=planFor(RQ.name,RQ.m),g=planGroup(l);if(g==='A'){RQ.g='A';RQ.rot=''}else if(g==='R'){RQ.g='R';RQ.rot=l}persist()}
 function planLine(){const row=planRow(RQ.name);if(!row)return'';const ks=monthOpts();const cur=row[RQ.m]||'';const g=planGroup(cur);
   return`<div class="rules" style="background:var(--ok-bg)"><strong>הסבב שלך לפי התכנית</strong>${ks.filter(k=>row[k]).map(k=>`${kLabel(k)}: ${esc(row[k])}${planGroup(row[k])==='A'?' (אגף א)':''}`).join(' · ')||'אין עדיין'}${g==='X'?`<div style="color:var(--warn);font-weight:600;margin-top:4px">ב${kLabel(RQ.m)} אתה רשום כ"${esc(cur)}", ולכן לא תשובץ. אם זה לא נכון, פנה לרכז/ת השיבוץ.</div>`:g==='M'?`<div style="color:var(--warn);font-weight:600;margin-top:4px">ב${kLabel(RQ.m)} אתה רשום במילואים. מילואים נחשבים כמו חופשה: סמן את ימי המילואים במצב "חופשה / מילואים", בחר את הקבוצה שלך בשאר החודש, והמכסה תרד בהתאם. אם אתה במילואים כל החודש, אין צורך להגיש.</div>`:''}</div>`}
+function nameList(){const ks=PLAN?Object.keys(PLAN):[];return(ks.length?ks:NAMES).slice().sort((a,b)=>a.localeCompare(b,'he'))}
+function nameSel(id,val,ph){const L=nameList();const v=L.includes(val)?val:'';return`<select id="${id}" style="min-width:150px"><option value="">${ph}</option>${L.map(n=>`<option ${n===v?'selected':''}>${esc(n)}</option>`).join('')}</select>`}
 function render(){
+  if(RQ.name&&!nameList().includes(RQ.name)){const c=x=>norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,'');const m=nameList().find(n=>c(n)===c(RQ.name));RQ.name=m||'';persist()}
   if(VIEW==='chg')return renderChg();
   if(VIEW==='cal')return renderCal();
   const key=RQ.m,N=kDim(key),chk=checkBlocks(key,RQ.g,units()),H=hol(key);
@@ -367,7 +370,7 @@ function render(){
   ${closed(RQ.m)?`<div class="rules" style="background:var(--danger-bg);color:var(--danger);font-weight:600">ההגשה ל${kLabel(RQ.m)} ננעלה ב־${dlText(RQ.m)}. לשינוי אחרי הנעילה, פנו לרכז/ת השיבוץ או שלחו בקשת החלפה אחרי פרסום הלוח.</div>`:dl(RQ.m)?`<div class="rules"><strong>מועד אחרון להגשה ל${kLabel(RQ.m)}: ${dlText(RQ.m)}</strong>אחרי המועד המערכת ננעלת. עד אז אפשר לשנות ולשלוח שוב, והבקשה האחרונה קובעת.</div>`:''}
   ${planLine()}
   <div class="fields">
-    <label>שם<input type="text" id="rqName" list="rqNames" value="${esc(RQ.name)}" autocomplete="off" placeholder="השם שלך"></label>
+    <label>שם${nameSel('rqName',RQ.name,'בחרו את השם שלכם')}</label>
     <datalist id="rqNames">${NAMES.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
     <label>חודש<select id="rqMonth">${monthOpts().map(k=>`<option value="${k}" ${k===key?'selected':''}>${kLabel(k)}</option>`).join('')}</select></label>
     <label>שיבוץ החודש<span class="seg"><button data-rqg="A" aria-pressed="${RQ.g==='A'}">אגף א (פיילוט)</button><button data-rqg="R" aria-pressed="${RQ.g==='R'}">רוטציה</button></span></label>
@@ -456,10 +459,12 @@ document.addEventListener('click',e=>{
     const q=buildReq();q.type='req';sendQ(q,message(q),`הבקשות שלך ל${kLabel(q.m)} נשלחו.`);
   }
 });
-document.addEventListener('input',e=>{const id=e.target.id;if(id==='chN'){RQ.name=e.target.value;persist();return}if(id==='chW'){CH.w=e.target.value;return}if(id==='chT'){CH.t=e.target.value;return}if(id==='rqNotes')RQ.t=e.target.value;else if(id==='rqRot')RQ.rot=e.target.value;else if(id==='rqName')RQ.name=e.target.value;else if(id==='rqVre'){RQ.vre=e.target.value;persist();render();return}else if(id==='rqVby')RQ.vby=e.target.value;else return;persist()});
+document.addEventListener('input',e=>{const id=e.target.id;if(id==='chT'){CH.t=e.target.value;return}if(id==='rqNotes')RQ.t=e.target.value;else if(id==='rqRot')RQ.rot=e.target.value;else if(id==='rqName')RQ.name=e.target.value;else if(id==='rqVre'){RQ.vre=e.target.value;persist();render();return}else if(id==='rqVby')RQ.vby=e.target.value;else return;persist()});
 document.addEventListener('change',e=>{const id=e.target.id;
   if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();autoGroup();persist();render()}
   else if(id==='rqName'){RQ.name=e.target.value;if(planRow(RQ.name))autoGroup();persist();render()}
+  else if(id==='chN'){RQ.name=e.target.value;persist();render()}
+  else if(id==='chW'){CH.w=e.target.value}
   else if(id==='rqWcode'){RQ.wcode=e.target.value;persist()}
   else if(id==='rqVre'){RQ.vre=e.target.value;persist();render()}
   else if(id==='calName'){RQ.name=e.target.value;persist();render()}
