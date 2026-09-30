@@ -345,7 +345,7 @@ function monthTab(key){
 async function pushState(){
   if(!(S.settings.apiUrl&&S.settings.apiKey))return;
   if(!S.synced){loadFromServer();return}
-  try{const st={...S,settings:{...S.settings,apiKey:''}};
+  try{ensurePlanNames();const st={...S,settings:{...S.settings,apiKey:''}};
     const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'saveState',key:S.settings.apiKey,ts:S.savedAt,state:JSON.stringify(st),tab:monthTab(S.cur)})});const j=await r.json();
     if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם':j.error==='action'?'צריך לעדכן את הקוד בגיליון':String(j.error));
     setSync('נשמר בגיליון '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}))}
@@ -683,8 +683,37 @@ function applyPlan(key){const mo=S.months[key];if(!mo||!S.rotPlan)return 0;let n
     if(!r){mo.roster[pid]=blankRoster(G.g,G.rot,'',Object.keys(mo.roster).length+1);n++;continue}
     if(r.group!==G.g||r.rot!==G.rot){r.group=G.g;r.rot=G.rot;n++}}return n}
 function planMonths(){const n=new Date(),set=new Set(Object.keys(S.months));for(const pid in (S.rotPlan||{}))for(const k in S.rotPlan[pid])set.add(k);for(let i=0;i<4;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);set.add(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return[...set].sort().slice(-8)}
+function nameKey(x){return norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,'')}
+function ensurePlanNames(){const n=new Date(),nowKey=`${n.getFullYear()}-${pad2(n.getMonth()+1)}`;S.rotPlan=S.rotPlan||{};
+  for(const k in S.months){if(k<nowKey)continue;for(const pid in S.months[k].roster)if(person(pid)&&!S.rotPlan[pid])S.rotPlan[pid]={}}}
+function personData(pid){let n=0;for(const k in S.months){const mo=S.months[k];if(mo.roster[pid]&&(mo.roster[pid].reqAt||mo.roster[pid].notes))n+=5;for(const c in mo.cells)if(c.startsWith(pid+'|'))n++}if(S.rotPlan&&S.rotPlan[pid])n+=Object.keys(S.rotPlan[pid]).length;return n}
+function findDups(){const g={};for(const p of S.people){const k=nameKey(p.name);if(!k)continue;(g[k]=g[k]||[]).push(p)}
+  const out=Object.values(g).filter(a=>a.length>1).map(a=>({sure:true,list:a}));
+  const keys=Object.keys(g);for(let i=0;i<keys.length;i++)for(let j=0;j<keys.length;j++){if(i===j)continue;const a=keys[i],b=keys[j];if(a.length>=3&&b.length>a.length&&b.startsWith(a))out.push({sure:false,list:[...g[a],...g[b]]})}
+  return out}
+function mergePeople(keepId,dropId){if(keepId===dropId)return;
+  for(const k in S.months){const mo=S.months[k];
+    if(mo.roster[dropId]){if(!mo.roster[keepId])mo.roster[keepId]=mo.roster[dropId];else{const a=mo.roster[keepId],b=mo.roster[dropId];if(!a.reqAt&&b.reqAt){a.reqAt=b.reqAt;a.reqG=b.reqG;a.notes=b.notes||a.notes;a.vacBy=b.vacBy||a.vacBy}}delete mo.roster[dropId]}
+    for(const c of Object.keys(mo.cells)){if(!c.startsWith(dropId+'|'))continue;const d=c.split('|')[1],kk=keepId+'|'+d,src=mo.cells[c],dst=mo.cells[kk];
+      if(!dst)mo.cells[kk]=src;else{for(const x of src.c)if(!dst.c.includes(x))dst.c.push(x);if(!dst.mk&&src.mk){dst.mk=src.mk;if(src.part)dst.part=src.part;if(src.wc)dst.wc=src.wc}}delete mo.cells[c]}}
+  if(S.rotPlan&&S.rotPlan[dropId]){S.rotPlan[keepId]={...S.rotPlan[dropId],...(S.rotPlan[keepId]||{})};delete S.rotPlan[dropId]}
+  const kp=person(keepId),dp=person(dropId);if(kp&&dp){kp.signer=kp.signer||dp.signer;kp.quals={...(dp.quals||{}),...(kp.quals||{})}}
+  S.people=S.people.filter(p=>p.id!==dropId)}
+function dupSheet(){
+  const groups=findDups();const opt=()=>[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he')).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  let h=`<h3>איחוד שמות כפולים</h3><p class="sub">לכל מתמחה שמופיע פעמיים בוחרים איזה שם להשאיר. הבקשות, השיבוצים והסבבים של השם השני עוברים אליו, והשם השני נמחק. בקשות לא נמחקות.</p>`;
+  if(groups.length)h+=groups.map((g,i)=>`<div class="rules"><strong>${g.sure?'כנראה אותו אדם':'אולי אותו אדם'}</strong>${g.list.map((p,j)=>`<label style="display:flex;gap:8px;align-items:center;margin:3px 0"><input type="radio" name="dg${i}" value="${p.id}" ${j===g.list.map(x=>personData(x.id)).indexOf(Math.max(...g.list.map(x=>personData(x.id))))?'checked':''}> ${esc(p.name)} <span style="color:var(--muted);font-size:12px">(${personData(p.id)?'יש נתונים':'ריק'})</span></label>`).join('')}<label style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:13px"><input type="checkbox" data-dg="${i}" ${g.sure?'checked':''}> לאחד</label></div>`).join('');
+  else h+=`<p class="sub">לא נמצאו שמות כפולים אוטומטית.</p>`;
+  h+=`<h4>איחוד ידני</h4><div class="row"><select id="mgKeep"><option value="">השם שנשאר</option>${opt()}</select><select id="mgDrop"><option value="">השם שנמחק</option>${opt()}</select></div>
+  <div class="foot"><button class="btn primary" id="dgGo">אחד</button><button class="btn" data-close>ביטול</button></div>`;
+  const sh=openSheet(h);
+  sh.el.querySelector('#dgGo').onclick=()=>{let n=0;pushUndo();
+    groups.forEach((g,i)=>{const on=sh.el.querySelector(`[data-dg="${i}"]`);if(!on||!on.checked)return;const keep=(sh.el.querySelector(`input[name="dg${i}"]:checked`)||{}).value;if(!keep)return;for(const p of g.list)if(p.id!==keep&&person(p.id)&&person(keep)){mergePeople(keep,p.id);n++}});
+    const k=sh.el.querySelector('#mgKeep').value,d=sh.el.querySelector('#mgDrop').value;if(k&&d&&k!==d){mergePeople(k,d);n++}
+    save();sh.close();render();toast(n?`אוחדו ${n} שמות`:'לא בוצע איחוד')};
+}
 function matchName(raw){const clean=x=>norm(x).replace(/["'׳״`]/g,'');const n=clean(raw);if(!n)return null;
-  return S.people.find(p=>clean(p.name)===n)||S.people.find(p=>{const c=clean(p.name);return c.length>1&&(n.startsWith(c+' ')||n.endsWith(' '+c)||c.startsWith(n+' ')||c.endsWith(' '+n))})||null}
+  return S.people.find(p=>clean(p.name)===n)||S.people.find(p=>nameKey(p.name)===nameKey(raw))||S.people.find(p=>{const c=clean(p.name);return c.length>1&&(n.startsWith(c+' ')||n.endsWith(' '+c)||c.startsWith(n+' ')||c.endsWith(' '+n))})||null}
 function importPlanText(txt){
   const lines=txt.split(/\r?\n/).map(l=>l.split('\t')).filter(r=>r.some(c=>norm(c)));if(!lines.length)return toast('לא נמצא טקסט');
   let hi=lines.findIndex(r=>r.some(c=>HEB_MONTHS.some(m=>norm(c).startsWith(m))));if(hi<0)return toast('לא נמצאה שורת כותרת עם שמות חודשים',4000);
@@ -729,7 +758,7 @@ function renderPeople(){
       <td><textarea data-f="notes" rows="2">${esc(r.notes)}</textarea></td>
       <td><button class="btn small danger" data-del="${pid}" aria-label="הסר את ${esc(pname(pid))} מהחודש">הסר</button></td></tr>`;
   }
-  h+=`</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn" id="bAddP">הוסף מתמחה</button></div></div>`;
+  h+=`</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn" id="bAddP">הוסף מתמחה</button><button class="btn" id="bDup">איחוד שמות כפולים</button></div></div>`;
   $('#main').innerHTML=h;
 }
 
@@ -1139,7 +1168,7 @@ function validRQ(){
   return true;
 }
 function applyRequest(q){
-  const mo=ensureMonth(q.m); let p=findPerson(q.n), isNew=false;
+  const mo=ensureMonth(q.m); let p=findPerson(q.n)||matchName(q.n), isNew=false;
   if(!p){p={id:uid(),name:norm(q.n)};S.people.push(p);isNew=true}
   if(!mo.roster[p.id])mo.roster[p.id]=blankRoster(q.g,q.g==='A'?'אגף א':(q.r||''),'',Object.keys(mo.roster).length+1);
   const r=mo.roster[p.id];
@@ -1276,7 +1305,7 @@ function pendingCard(q,i){
   ${chk.errs.map(e=>`<div class="errs">${esc(e)}</div>`).join('')}${notes.map(n=>`<div style="color:var(--warn);font-weight:600">${esc(n)}</div>`).join('')}</div></div>`;
 }
 function chgCheck(q){
-  const errs=[],mo=S.months[q.m],p1=findPerson(q.n),p2=findPerson(q.w);
+  const errs=[],mo=S.months[q.m],p1=findPerson(q.n)||matchName(q.n),p2=findPerson(q.w)||matchName(q.w);
   if(!mo){errs.push(`אין לוח ל${kLabel(q.m)}`);return{errs}}
   if(!p1||!mo.roster[p1.id])errs.push(`${q.n} לא נמצא בלוח`);
   if(!p2||!mo.roster[p2.id])errs.push(`${q.w} לא נמצא בלוח`);
@@ -1437,6 +1466,7 @@ $('#main').addEventListener('click',e=>{
   if(b.dataset.pref){const pid=b.closest('tr').dataset.pid,r=M().roster[pid];r.pref=r.pref||{};const v=r.pref[b.dataset.pref];if(v===1)r.pref[b.dataset.pref]=-1;else if(v===-1)delete r.pref[b.dataset.pref];else r.pref[b.dataset.pref]=1;save();renderPeople();return}
   if(b.dataset.del){const pid=b.dataset.del;if(!confirm(`להסיר את ${pname(pid)} מהחודש הזה, כולל השיבוצים שלו?`))return;pushUndo();delete M().roster[pid];for(const k in M().cells)if(k.startsWith(pid+'|'))delete M().cells[k];save();renderPeople();return}
   if(b.id==='planGo'){importPlanText($('#planPaste').value);return}
+  if(b.id==='bDup'){dupSheet();return}
   if(b.id==='bAddP'){const id=uid();S.people.push({id,name:'מתמחה חדש'});M().roster[id]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();const inp=document.querySelector(`tr[data-pid="${id}"] input[data-f="name"]`);inp&&(inp.focus(),inp.select());return}
   if(b.id==='bCopy'){copyLuach();return}
   if(b.id==='bCal'){calSheet();return}
