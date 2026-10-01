@@ -249,7 +249,7 @@ const HOLIDAYS={Tishri:{1:['hol','ראש השנה'],2:['hol','ראש השנה'],
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad2=n=>String(n).padStart(2,'0');
-const norm=s=>String(s||'').trim().replace(/\s+/g,' ');
+const norm=s=>String(s||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00ad]/g,'').trim().replace(/\s+/g,' ');
 const _hc={};
 function hol(key){if(_hc[key])return _hc[key];const out={},[y,m]=key.split('-').map(Number);
   try{const f=new Intl.DateTimeFormat('en-u-ca-hebrew',{day:'numeric',month:'long'});for(let d=1;d<=kDim(key);d++){const p=f.formatToParts(new Date(y,m-1,d));const hm=p.find(x=>x.type==='month')?.value,hd=Number(p.find(x=>x.type==='day')?.value);const h=HOLIDAYS[hm]&&HOLIDAYS[hm][hd];if(h)out[d]={t:h[0],name:h[1]}}}catch(e){}
