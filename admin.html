@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 48</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 50</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,7 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v15){S.v15=1;const bs=S.people.find(p=>nameKey(p.name)===nameKey('בת שבע'));if(bs){bs.rules=bs.rules||{};bs.rules.noCodes=[...new Set([...(bs.rules.noCodes||[]),'i'])]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v14){S.v14=1;if(S.settings.boardCols)S.settings.boardCols=S.settings.boardCols.replace(/^\s*כירורגיה\s*:\s*mc[\s,]+nc\s*$/m,'כירורגיה בוקר: mc\nכירורגיה ערב: nc');try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v13){S.v13=1;if(!S.settings.boardUrl)S.settings.boardUrl='https://docs.google.com/spreadsheets/d/1IbVJDhWcut7F37GjC4nFQNwViArzh5nvR1EhfW4eoYQ/edit?gid=1132372113#gid=1132372113';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v12){S.v12=1;if(S.settings.intWkMax===undefined)S.settings.intWkMax=0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -336,7 +337,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 48';
+const BUILD='1.10.2026 גרסה 50';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -463,6 +464,7 @@ function analyze(){
         if(isWeekend(d))cnt.wk.add(d);
         if(sigReqOn(t,d)&&!isSigner(pid))add(pid,d,'err',`ב${t.name} ביום ${WD_LONG[wd(d)]} נדרש חותם שחרור`);
         if(!qualified(pid,t))add(pid,d,'err',`לא מאושר ל${t.name}`);
+        if((rulesOf(pid).noCodes||[]).includes(code))add(pid,d,'err',`לפי כלל אישי לא משובץ ב${t.name}`);
         if(wkndMorning(t,d)&&!cl.c.includes('v'))add(pid,d,'warn','בסופ״ש ובחג בוקר צד ב עושה מי שבתורנות צד ב באותו יום');
         if(r.group==='X')add(pid,d,'warn','המתמחה מסומן כלא זמין החודש');
         else if(!t.groups.includes(r.group))add(pid,d,'warn',`${t.name} לא מיועד ל${GROUPS[r.group]}`);
@@ -473,6 +475,8 @@ function analyze(){
       for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d,typeBy(code));if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
     }
     {const nd=new Set(list.filter(x=>isNight(typeBy(x.code))).map(x=>x.d));for(const d of nd)if(nd.has(d-1)&&nd.has(d-2))add(pid,d,'err','שלושה לילות ברצף')}
+    {const codesOn=dd=>cellOf(pid,dd).c;const duty=dd=>{const c=codesOn(dd);return c.some(x=>typeBy(x)?.kind==='duty')||(c.includes('mc')&&c.includes('nc'))};const pn=dd=>{const c=codesOn(dd);return c.some(x=>{const t=typeBy(x);return t&&t.kind==='shift'&&isNight(t)})&&!(c.includes('mc')&&c.includes('nc'))};
+     for(let d=1;d<N;d++)if((duty(d)&&pn(d+1))||(pn(d)&&duty(d+1))){add(pid,d,'err','תורנות ולילה בימים רצופים');add(pid,d+1,'err','תורנות ולילה בימים רצופים')}}
     {const cc={};for(const x of list){const t=typeBy(x.code);cc[x.code]=(cc[x.code]||0)+1;if(t.noWeekend&&isWeekend(x.d))add(pid,x.d,'warn',`${t.name} לא משובץ בסופ״ש`);if(t.maxPer&&Number(t.maxPer)>0&&cc[x.code]>Number(t.maxPer))add(pid,x.d,'warn',`יותר מ־${t.maxPer} ${t.name} בחודש`)}}
     list.sort((a,b)=>a.s-b.s);
     for(let i=1;i<list.length;i++){
@@ -502,7 +506,7 @@ function buildCtx(){
   const ctx={occ:{},iv:{},cnt:{},tgt:{},days:{},frac:{},gs:{A:{mo:0,ni:0,wk:0,f:0},R:{mo:0,ni:0,wk:0,f:0},X:{mo:0,ni:0,wk:0,f:0}}};
   for(const pid of rosterIds()){
     ctx.iv[pid]=[];ctx.cnt[pid]={shift:0,duty:0,day:0,other:0,wk:0,mo:0,ni:0};ctx.cc=ctx.cc||{};ctx.cc[pid]={};ctx.frac[pid]=availFrac(pid);ctx.tgt[pid]=targets(pid);ctx.days[pid]=new Set();
-    for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);for(const code of cl.c){const t=typeBy(code);if(!t)continue;{const x=iv(code,d);ctx.iv[pid].push({d,...x,ni:isNight(t),k:t.kind});ctx.cc[pid][code]=(ctx.cc[pid][code]||0)+1;if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x})}addUnits(ctx.cnt[pid],pid,t,d,1);if(isMorn(t))ctx.cnt[pid].mo++;if(isNight(t))ctx.cnt[pid].ni++;ctx.days[pid].add(d)}
+    for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);for(const code of cl.c){const t=typeBy(code);if(!t)continue;{const x=iv(code,d);ctx.iv[pid].push({d,...x,ni:isNight(t),k:t.kind,c:code});ctx.cc[pid][code]=(ctx.cc[pid][code]||0)+1;if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x})}addUnits(ctx.cnt[pid],pid,t,d,1);if(isMorn(t))ctx.cnt[pid].mo++;if(isNight(t))ctx.cnt[pid].ni++;ctx.days[pid].add(d)}
       if(M().roster[pid].group==='A'&&cl.c.includes('mc')&&cl.c.includes('nc')){ctx.cnt[pid].shift-=2;ctx.cnt[pid].duty++}
       if(M().roster[pid].group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){ctx.cnt[pid].shift-=sh;ctx.cnt[pid].duty++}}
       if(cl.c.length&&isWeekend(d))ctx.cnt[pid].wk++}
@@ -537,10 +541,14 @@ function evaluate(pid,t,d,ctx){
   {const tn=isNight(t);let adj=0,nd=0;for(const y of ctx.iv[pid]){const dd=Math.abs(y.d-d);if(dd===0||dd>2)continue;if(tn&&y.ni){if(dd===1){score-=7;adj++;if((t.kind==='duty'&&y.k==='shift')||(t.kind==='shift'&&y.k==='duty')){score-=10;nd++}}else score-=3}else if(dd===1)score-=1.5}if(nd)why.push('לילה צמוד לתורנות');else if(adj)why.push('לילה צמוד ללילה אחר')}
   if(t.kind==='day'){const h=homeOf(pid);if(h===t.code){score+=15;why.push('הבוקר הקבוע שלו')}else if(h===''&&t.code==='b'){score-=6+3*c.day;if(isICU(pid)){score-=10;why.push('ב־ICU, עדיף שלא')}if(c.day)why.push(`כבר מילא ${c.day} בקרים`)}}
   if(wkndMorning(t,d)&&!cl0.c.includes('v')){hard=true;why.push('בסופ״ש בוקר צד ב עושה התורן')}
+  if((rulesOf(pid).noCodes||[]).includes(t.code)){hard=true;why.push(`לפי כלל אישי לא משובץ ב${t.name}`)}
   if(t.noWeekend&&isWeekend(d)){hard=true;why.push('לא בסופ״ש')}
   if(t.internal&&isWeekend(d)&&intWkMax()!==null&&(ctx.intWk||0)>=intWkMax()){hard=true;why.push(`מקסימום ${intWkMax()} תורנויות פנימית בסופ״ש`)}
   if(t.maxPer&&Number(t.maxPer)>0&&(ctx.cc[pid][t.code]||0)>=Number(t.maxPer)){hard=true;why.push(`כבר קיבל ${t.short} החודש`)}
   if(isMorn(t)&&!isNight(t)){const md=new Set(ctx.iv[pid].filter(y=>!y.ni&&(y.s%1440)<720).map(y=>y.d));if((md.has(d-1)&&md.has(d-2))||(md.has(d-1)&&md.has(d+1))||(md.has(d+1)&&md.has(d+2))){score-=14;why.push('בוקר שלישי ברצף')}}
+  if(isNight(t)){const L=ctx.iv[pid],dutyOn=dd=>L.some(y=>y.d===dd&&(y.k==='duty'||(y.c==='nc'&&L.some(z=>z.d===dd&&z.c==='mc')))),pureNightOn=dd=>L.some(y=>y.d===dd&&y.ni&&y.k==='shift'&&!(y.c==='nc'&&L.some(z=>z.d===dd&&z.c==='mc')));
+    const tDuty=t.kind==='duty'||(t.code==='nc'&&L.some(z=>z.d===d&&z.c==='mc'));
+    if(tDuty?(pureNightOn(d-1)||pureNightOn(d+1)):(dutyOn(d-1)||dutyOn(d+1))){hard=true;why.push('תורנות ולילה בימים רצופים')}}
   if(isNight(t)){const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2))){hard=true;why.push('שלושה לילות ברצף')}}
   if(sigReqOn(t,d)&&!isSigner(pid)){hard=true;why.push('ביום הזה נדרש חותם שחרור')}
   if(t.internal){if(isSigner(pid)){if(t.forSigners){score+=6;why.push('חותם, עדיף במהלכים')}else score-=6}else if(t.forSigners)score-=4}
@@ -556,7 +564,7 @@ function evaluate(pid,t,d,ctx){
   if(isWeekend(d)&&!ctx.days[pid].has(d)){score-=4*dev('wk');if(c.wk)why.push(`${c.wk} סופ״ש/חג`)}
   return{hard,why,score};
 }
-function commit(ctx,pid,t,d){if(t.internal&&isWeekend(d))ctx.intWk=(ctx.intWk||0)+1;const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||0)+1;ctx.iv[pid].push({d,...x,ni:isNight(t),k:t.kind});if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x});addUnits(c,pid,t,d,1);if(isMorn(t)){c.mo++;G.mo++}if(isNight(t)){c.ni++;G.ni++}if(isWeekend(d)&&!ctx.days[pid].has(d)){c.wk++;G.wk++}ctx.days[pid].add(d)}
+function commit(ctx,pid,t,d){if(t.internal&&isWeekend(d))ctx.intWk=(ctx.intWk||0)+1;const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||0)+1;ctx.iv[pid].push({d,...x,ni:isNight(t),k:t.kind,c:t.code});if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x});addUnits(c,pid,t,d,1);if(isMorn(t)){c.mo++;G.mo++}if(isNight(t)){c.ni++;G.ni++}if(isWeekend(d)&&!ctx.days[pid].has(d)){c.wk++;G.wk++}ctx.days[pid].add(d)}
 
 function uncommit(ctx,pid,t,d){if(t.internal&&isWeekend(d))ctx.intWk--;const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||1)-1;
   const i=ctx.iv[pid].findIndex(y=>y.d===d&&y.s===x.s&&y.e===x.e);if(i>=0)ctx.iv[pid].splice(i,1);addUnits(c,pid,t,d,-1);if(isMorn(t)){c.mo--;G.mo--}if(isNight(t)){c.ni--;G.ni--}
@@ -573,7 +581,8 @@ function can24(pid,d,ctx,mcT,ncT,ignorePid){
   for(const[t,x] of [[mcT,a],[ncT,b]])if(t.loc&&(ctx.occ[t.loc]||[]).some(y=>y.pid!==pid&&y.pid!==ignorePid&&x.s<y.e&&y.s<x.e))return null;
   if(sigReqOn(ncT,d)&&!isSigner(pid))return null;
   if(shabbatHit(pid,{s:a.s,e:b.e}))return null;
-  {const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2)))return null}
+  {const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2)))return null;
+   if(ctx.iv[pid].some(y=>(y.d===d-1||y.d===d+1)&&y.ni&&y.k==='shift'))return null}
   const c=ctx.cnt[pid],tg=ctx.tgt[pid];if(c.duty>=tg.D)return null;
   let sc=10*(tg.D-c.duty)/Math.max(tg.D,1)+Math.random()*2;const p=(r.pref||{});if(p.mc===1||p.nc===1)sc+=4;if(p.mc===-1||p.nc===-1)sc-=8;
   if(cl.mk==='soft')sc-=8;if(cl.mk==='want'&&(!cl.wc||cl.wc==='@duty'||cl.wc==='mc'||cl.wc==='nc'))sc+=6;
@@ -869,10 +878,11 @@ function planPanel(){
 function rulesPanel(){
   const ppl=[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he'));const withR=ppl.filter(p=>p.rules&&Object.keys(p.rules).length);
   let h=`<div class="panel"><h2>כללים אישיים</h2><p class="hint">הסכמות מיוחדות למתמחה מסוים. הן חלות על כל החודשים, והשיבוץ האוטומטי מכבד אותן.</p>`;
-  if(withR.length)h+=`<div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>תורנויות בחודש רוטציה</th><th>בחודשי מלר״ד: לא עובד מליל שישי 21:00 עד מוצ״ש 21:00</th><th>בחודשי מלר״ד: משמרת יום שישי נספרת כ</th><th></th></tr></thead><tbody>${withR.map(p=>{const ru=p.rules;return`<tr data-rp="${p.id}"><td><strong>${esc(p.name)}</strong></td>
+  if(withR.length)h+=`<div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>תורנויות בחודש רוטציה</th><th>בחודשי מלר״ד: לא עובד מליל שישי 21:00 עד מוצ״ש 21:00</th><th>בחודשי מלר״ד: משמרת יום שישי נספרת כ</th><th>לא לשבץ ב</th><th></th></tr></thead><tbody>${withR.map(p=>{const ru=p.rules;return`<tr data-rp="${p.id}"><td><strong>${esc(p.name)}</strong></td>
     <td><input type="number" min="0" data-ru="rotD" value="${ru.rotD??''}" placeholder="${S.settings.baseRD}"></td>
     <td style="text-align:center"><input type="checkbox" data-ru="shabbat" ${ru.shabbat?'checked':''}></td>
     <td><select data-ru="friLong">${[['one','משמרת אחת'],['two','2 משמרות'],['duty','תורנות']].map(([k,v])=>`<option value="${k}" ${(ru.friLong||'one')===k?'selected':''}>${v}</option>`).join('')}</select></td>
+    <td><div class="prefchips">${S.types.filter(t=>t.kind==='duty'||t.kind==='shift').map(t=>`<button data-runo="${t.code}" class="${(ru.noCodes||[]).includes(t.code)?'avoid':''}" title="${esc(t.name)}">${esc(t.short)}</button>`).join('')}</div></td>
     <td><button class="btn small danger" data-rudel="${p.id}">הסר</button></td></tr>`}).join('')}</tbody></table></div>`;
   h+=`<div class="row" style="margin-top:10px"><select id="ruAdd"><option value="">הוסף כללים למתמחה…</option>${ppl.filter(p=>!withR.includes(p)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div></div>`;
   return h;
@@ -1715,6 +1725,7 @@ $('#main').addEventListener('click',e=>{
   if(b.dataset.addprog){const n=b.dataset.addprog;const p={id:uid(),name:n,sheetName:n};S.people.push(p);save();syncProgram(true);return}
   if(b.id==='planGo'){importPlanText($('#planPaste').value);return}
   if(b.dataset.unrem){const pid=b.dataset.unrem;delete M().removed[pid];applyPlan(S.cur);if(!M().roster[pid])M().roster[pid]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();return}
+  if(b.dataset.runo){const p=person(b.closest('tr[data-rp]').dataset.rp);p.rules=p.rules||{};const L=new Set(p.rules.noCodes||[]);const c=b.dataset.runo;L.has(c)?L.delete(c):L.add(c);p.rules.noCodes=[...L];save();renderPeople();return}
   if(b.dataset.rudel){const p=person(b.dataset.rudel);if(p&&confirm(`להסיר את הכללים האישיים של ${p.name}?`)){delete p.rules;save();renderPeople()}return}
   if(b.id==='bDup'){dupSheet();return}
   if(b.id==='bAddP'){const id=uid();S.people.push({id,name:'מתמחה חדש'});M().roster[id]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();const inp=document.querySelector(`tr[data-pid="${id}"] input[data-f="name"]`);inp&&(inp.focus(),inp.select());return}
