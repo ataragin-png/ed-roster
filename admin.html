@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 50</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 51</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -337,7 +337,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 50';
+const BUILD='1.10.2026 גרסה 51';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -1021,6 +1021,15 @@ function swapOptions(P,d,code){
   finally{give(P,d,code)}
   return out.sort((a,b)=>b.score-a.score).slice(0,15);
 }
+function applySwap(P,d,code,o){let cl=cellOf(P,d);setCell(P,d,{c:cl.c.filter(x=>x!==code),mk:cl.mk});cl=cellOf(o.Q,o.d2);setCell(o.Q,o.d2,{c:cl.c.filter(x=>x!==o.c2),mk:cl.mk});
+  cl=cellOf(o.Q,d);setCell(o.Q,d,{c:[...cl.c,code],mk:cl.mk});cl=cellOf(P,o.d2);setCell(P,o.d2,{c:[...cl.c,o.c2],mk:cl.mk});if(M().final)addLog(S.cur,`החלפה: ${pname(P)} (${d}) ⇄ ${pname(o.Q)} (${o.d2})`)}
+function autoFix(P,d,mode){pushUndo();const done=[],fail=[];
+  if(mode==='free'){for(const code of [...cellOf(P,d).c]){const t=typeBy(code);if(!t)continue;const o=swapOptions(P,d,code)[0];if(o){applySwap(P,d,code,o);done.push(`${pname(o.Q)} לוקח/ת את ${t.name} ב־${d}, ו${pname(P)} עובר/ת ל־${o.d2}`)}else fail.push(t.name)}}
+  else{const cl=cellOf(P,d);const codes=S.types.filter(t=>wcMatch(cl.wc,t)&&t.groups.includes(M().roster[P].group)).map(t=>t.code);let best=null;
+    for(const code of codes)for(const X of filled(code,d)){if(X===P)continue;const o=swapOptions(X,d,code).find(o=>o.Q===P);if(o&&(!best||o.score>best.o.score))best={X,code,o}}
+    if(best){applySwap(best.X,d,best.code,best.o);done.push(`${pname(P)} עובר/ת ל${typeBy(best.code).name} ב־${d}, ו${pname(best.X)} מקבל/ת במקום את ${best.o.d2}`)}else fail.push('לא נמצאה החלפה שעומדת בכל הכללים')}
+  save();if(!done.length)undoStack.pop();
+  return done.length?'בוצע: '+done.join('; ')+(fail.length?`. לא הסתדר: ${fail.join(', ')}`:''):'לא נמצאה החלפה שעומדת בכל הכללים. אפשר לנסות ידנית דרך "החלפה".'}
 function swapSheet(P,d,code){
   const t=typeBy(code);const opts=swapOptions(P,d,code);
   const h=`<h3>החלפה: ${esc(pname(P))}, ${esc(t.name)} ב־${fmtDate(d)}</h3><p class="sub">בכל אפשרות: המתמחה השני לוקח את המשמרת הזו, ו${esc(pname(P))} לוקחת ממנו משמרת מאותו סוג ביום אחר. כל הכללים נבדקו (חסימות, מנוחה, לילות ברצף, מקומות ועוד). האפשרויות הטובות ביותר למעלה.</p>
@@ -1046,6 +1055,9 @@ function cellSheet(pid,d){
     if(cl.mk==='want')h+=`<h4>איזו משמרת ביקש</h4><div class="opts"><button class="opt" data-wc="" aria-pressed="${!cl.wc}">כל משמרת</button>${Object.entries(WCAT).map(([k,v])=>`<button class="opt" data-wc="${k}" aria-pressed="${cl.wc===k}">${v}</button>`).join('')}${elig.map(t=>`<button class="opt" data-wc="${t.code}" aria-pressed="${cl.wc===t.code}"><span class="chip c-${t.color}">${esc(t.short)}</span>${esc(t.name)}</button>`).join('')}</div>`;
     if(is)h+=`<ul class="issues">${is.msgs.map(m=>`<li class="${is.lvl}">${esc(m)}</li>`).join('')}</ul>`;
     if(r.notes)h+=`<h4>בקשות המתמחה</h4><div class="note">${esc(r.notes)}</div>`;
+    {const blocked=(cl.mk==='off'||cl.mk==='vac')&&cl.c.some(c=>{const t=typeBy(c);return t&&(cl.mk==='vac'||blockHit(pid,iv(c,d),d,t))});
+     const wantMiss=cl.mk==='want'&&!cl.c.some(c=>typeBy(c)&&wcMatch(cl.wc,typeBy(c)));
+     if(blocked||wantMiss)h+=`<div class="rules" style="background:var(--warn-bg);margin-top:12px"><strong>${blocked?'המתמחה משובץ ביום שסומן כחסום':'הבקשה לעבוד ביום הזה עוד לא מתקיימת'}</strong>${blocked?'האתר יעביר את המשמרת למתמחה אחר בהחלפה, כך שמספר המשמרות של כולם יישאר אותו דבר.':'האתר ייתן לו את המשמרת המבוקשת בהחלפה עם מי שמשובץ בה, כך שמספר המשמרות של כולם יישאר אותו דבר.'}<div class="row" style="margin-top:8px"><button class="btn small primary" data-autofix="${blocked?'free':'want'}">${blocked?'פנה את היום בהחלפה':'השג את המשמרת בהחלפה'}</button></div></div>`}
     if(cl.c.length)h+=`<h4>להעביר משמרת ליום אחר</h4><div class="opts">${cl.c.filter(c=>typeBy(c)).map(c=>`<button class="opt" data-swap="${c}">🔁 ${esc(typeBy(c).name)}: החלפה עם מתמחה אחר</button>`).join('')}</div><p class="sub" style="margin:4px 0 0">מוצאים מתמחה שייקח את המשמרת הזו, ו${esc(pname(pid))} תקבל במקומה משמרת שלו ביום אחר. כך לאף אחד לא משתנה מספר המשמרות.</p>`;
     h+=`<div class="foot"><button class="btn primary" data-close>סיום</button><button class="btn" data-clearcell>נקה תא</button></div>`;
     return h;
@@ -1055,6 +1067,7 @@ function cellSheet(pid,d){
     const b=e.target.closest('button');if(!b)return;
     const cl=cellOf(pid,d);
     if(b.dataset.swap){sh.close();swapSheet(pid,d,b.dataset.swap);return}
+    if(b.dataset.autofix){const r=autoFix(pid,d,b.dataset.autofix);sh.el.innerHTML=draw();renderGrid();toast(r,5000);return}
     if(b.dataset.code){pushUndo();const c=b.dataset.code;const arr=cl.c.includes(c)?cl.c.filter(x=>x!==c):[...cl.c,c];setCell(pid,d,{c:arr,mk:cl.mk})}
     else if(b.dataset.mk!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:b.dataset.mk})}
     else if(b.dataset.part!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:'off',part:b.dataset.part})}
