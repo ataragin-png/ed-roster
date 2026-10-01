@@ -767,7 +767,12 @@ function mergePeople(keepId,dropId){if(keepId===dropId)return;
       if(!dst)mo.cells[kk]=src;else{for(const x of src.c)if(!dst.c.includes(x))dst.c.push(x);if(!dst.mk&&src.mk){dst.mk=src.mk;if(src.part)dst.part=src.part;if(src.wc)dst.wc=src.wc}}delete mo.cells[c]}}
   if(S.rotPlan&&S.rotPlan[dropId]){S.rotPlan[keepId]={...S.rotPlan[dropId],...(S.rotPlan[keepId]||{})};delete S.rotPlan[dropId]}
   const kp=person(keepId),dp=person(dropId);if(kp&&dp){kp.signer=kp.signer||dp.signer;kp.quals={...(dp.quals||{}),...(kp.quals||{})}}
+  if(dp){S.nameAliases=S.nameAliases||{};S.nameAliases[nameKey(dp.name)]=keepId;if(dp.sheetName)S.nameAliases[nameKey(dp.sheetName)]=keepId;for(const k in S.nameAliases)if(S.nameAliases[k]===dropId)S.nameAliases[k]=keepId}
   S.people=S.people.filter(p=>p.id!==dropId)}
+function autoDedupe(){let n=0;const g={};for(const p of S.people){const k=nameKey(p.name);if(!k)continue;(g[k]=g[k]||[]).push(p)}
+  for(const k in g){const L=g[k];if(L.length<2)continue;L.sort((a,b)=>personData(b.id)-personData(a.id));for(const p of L.slice(1)){mergePeople(L[0].id,p.id);n++}}
+  for(const p of S.people){const al=(S.nameAliases||{})[nameKey(p.name)];if(al&&al!==p.id&&person(al)){mergePeople(al,p.id);n++}}
+  if(n){save();render();toast(`אוחדו אוטומטית ${n} שמות כפולים`,4000)}return n}
 function dupSheet(){
   const groups=findDups();const opt=()=>[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he')).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   let h=`<h3>איחוד שמות כפולים</h3><p class="sub">לכל מתמחה שמופיע פעמיים בוחרים איזה שם להשאיר. הבקשות, השיבוצים והסבבים של השם השני עוברים אליו, והשם השני נמחק. בקשות לא נמחקות.</p>`;
@@ -779,7 +784,7 @@ function dupSheet(){
   sh.el.querySelector('#dgGo').onclick=()=>{let n=0;pushUndo();
     groups.forEach((g,i)=>{const on=sh.el.querySelector(`[data-dg="${i}"]`);if(!on||!on.checked)return;const keep=(sh.el.querySelector(`input[name="dg${i}"]:checked`)||{}).value;if(!keep)return;for(const p of g.list)if(p.id!==keep&&person(p.id)&&person(keep)){mergePeople(keep,p.id);n++}});
     const k=sh.el.querySelector('#mgKeep').value,d=sh.el.querySelector('#mgDrop').value;if(k&&d&&k!==d){mergePeople(k,d);n++}
-    save();sh.close();render();toast(n?`אוחדו ${n} שמות`:'לא בוצע איחוד')};
+    save();clearTimeout(syncTimer);pushState();sh.close();render();toast(n?`אוחדו ${n} שמות. השמות האלה לא יחזרו`:'לא בוצע איחוד')};
 }
 function matchName(raw){const clean=x=>norm(x).replace(/["'׳״`]/g,'');const n=clean(raw);if(!n)return null;
   return S.people.find(p=>clean(p.name)===n)||S.people.find(p=>nameKey(p.name)===nameKey(raw))||S.people.find(p=>{const c=clean(p.name);return c.length>1&&(n.startsWith(c+' ')||n.endsWith(' '+c)||c.startsWith(n+' ')||c.endsWith(' '+n))})||null}
@@ -1205,8 +1210,8 @@ function kWeekend(key,d){const w=kWd(key,d);return w===5||w===6||!!kType(key,d)}
 function kLabel(key){const[y,m]=key.split('-').map(Number);return`${HEB_MONTHS[m-1]} ${y}`}
 function defaultReqMonth(){const n=new Date(),dt=new Date(n.getFullYear(),n.getMonth()+1,1);return`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`}
 function monthOpts(){const n=new Date(),set=new Set(Object.keys(S.months));for(let i=0;i<3;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);set.add(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return[...set].sort()}
-function norm(s){return String(s||'').trim().replace(/\s+/g,' ')}
-function findPerson(name){const n=norm(name);if(!n)return null;return S.people.find(p=>norm(p.name)===n)||null}
+function norm(s){return String(s||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00ad]/g,'').trim().replace(/\s+/g,' ')}
+function findPerson(name){const n=norm(name);if(!n)return null;const ex=S.people.find(p=>norm(p.name)===n);if(ex)return ex;const k=typeof nameKey==='function'?nameKey(n):n;const al=(S.nameAliases||{})[k];if(al&&S.people.find(p=>p.id===al))return S.people.find(p=>p.id===al);return typeof nameKey==='function'?S.people.find(p=>nameKey(p.name)===k)||null:null}
 function rulesFor(g){const r=S.settings.req;return g==='R'?{max:r.R,wk:r.wkR}:{max:r.A,wk:r.wkA}}
 function checkBlocks(key,g,blocks){
   const ru=rulesFor(g), wk=blocks.filter(d=>kWeekend(key,d)).length, errs=[];
@@ -1402,7 +1407,7 @@ async function pullRequests(auto){
     if(!fresh.length){save();if(!auto)toast('אין בקשות חדשות');if(tab==='inbox')render();return}
     fresh.forEach(x=>seen.add(x.row));S.apiSeen=[...seen];
     const list=fresh.map(x=>{const q=x.q||{};q.type=q.type==='chg'?'chg':'req';return q});
-    ingestQs(list,0);
+    ingestQs(list,0);autoDedupe();
   }catch(e){toast('משיכת הבקשות נכשלה: '+e.message,4500)}
   finally{pulling=false}
 }
@@ -1655,7 +1660,8 @@ $('#main').addEventListener('change',e=>{
     save();}
 });
 render();
-loadFromServer().then(()=>{syncProgram(false);if(tab==='inbox')pullRequests(true)});
+autoDedupe();
+loadFromServer().then(()=>{autoDedupe();syncProgram(false);if(tab==='inbox')pullRequests(true)});
 </script>
 </body>
 </html>
