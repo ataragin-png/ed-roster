@@ -396,6 +396,7 @@ function isSigner(pid){const p=person(pid);return!!(p&&p.signer)&&M().roster[pid
 function sigDay(d){return S.types.some(t=>t.signer&&need(t.code,d))}
 function signersOn(d){return rosterIds().filter(p=>isSigner(p)&&cellOf(p,d).c.some(c=>typeBy(c)?.signer))}
 function didRot(pid,re){const rp=(S.rotPlan||{})[pid]||{};const rx=new RegExp(re);for(const k in rp)if(k<=S.cur&&rx.test(rp[k]))return true;return false}
+function firstRot(pid,re){const rp=(S.rotPlan||{})[pid]||{};const rx=new RegExp(re);return Object.keys(rp).sort().find(k=>k<=S.cur&&rx.test(rp[k]))||''}
 function qualified(pid,t){if(!t.restrict)return true;if((person(pid)?.quals||{})[t.code])return true;return!!(t.qualRot&&didRot(pid,t.qualRot))}
 function internalCount(){let n=0;for(let d=1;d<=dim();d++)for(const t of S.types)if(t.internal)n+=filled(t.code,d).length;return n}
 function homeOf(pid){const r=M().roster[pid];if(!r||r.group!=='R')return'';if(r.home!==undefined)return r.home;return/ב\s*\+\s*ג|צד\s*ב|כירורגיה/.test(r.rot||'')?'b':''}
@@ -870,7 +871,7 @@ function renderPeople(){
       <td><input type="number" min="0" data-f="tS" value="${r.tS??''}" placeholder="${r.group==='A'?tg.Sraw.toFixed(1):'0'}"></td>
       <td><input type="number" min="0" data-f="tD" value="${r.tD??''}" placeholder="${tg.Draw.toFixed(1)}"></td>
       <td style="text-align:center"><input type="checkbox" data-f="signer" ${person(pid).signer?'checked':''} aria-label="חותם שחרור"></td>
-      ${S.types.filter(t=>t.restrict).map(t=>`<td style="text-align:center"><input type="checkbox" data-qual="${t.code}" ${(person(pid).quals||{})[t.code]?'checked':''} aria-label="מאושר ל${esc(t.name)}"></td>`).join('')}
+      ${S.types.filter(t=>t.restrict).map(t=>{const rk=t.qualRot&&firstRot(pid,t.qualRot);return`<td style="text-align:center;white-space:nowrap"><input type="checkbox" data-qual="${t.code}" ${(person(pid).quals||{})[t.code]?'checked':''} aria-label="מאושר ל${esc(t.name)}">${rk?`<div style="font-size:11px;color:var(--ok);font-weight:600" title="עשה סבב לפי תוכנית ההתמחות">✓ סבב ${kLabel(rk)}</div>`:''}</td>`}).join('')}
       <td><div class="prefchips">${S.types.filter(t=>t.groups.includes(r.group)).map(t=>{const p=(r.pref||{})[t.code];return`<button data-pref="${t.code}" class="${p===1?'pref':p===-1?'avoid':''}" title="${esc(t.name)}">${esc(t.short)}</button>`}).join('')}</div></td>
       <td><textarea data-f="notes" rows="2">${esc(r.notes)}</textarea></td>
       <td><button class="btn small danger" data-del="${pid}" aria-label="הסר את ${esc(pname(pid))} מהחודש">הסר</button></td></tr>`;
