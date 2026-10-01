@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 42</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 43</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -334,7 +334,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 42';
+const BUILD='1.10.2026 גרסה 43';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -639,6 +639,12 @@ function autofill(){
     dutyRound(intTypes,0,16);
     // שלב 3ג: אם עדיין חסרות תורנויות במכסה, תורנות חוץ נוספת
     dutyRound(extraTypes,0,14);
+    // שלב 3ד: השלמת מכסות למי שעדיין חסר, בחיפוש על כל ימי החודש
+    for(let pass=0;pass<6;pass++){let any=false;
+      for(const pid of ids){if(M().roster[pid].group==='X'||ctx.cnt[pid].duty>=ctx.tgt[pid].D)continue;
+        let bt=null,bd=0,bs=-1e9;for(let d=1;d<=N;d++)for(const t of [...intTypes,...extraTypes]){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random();if(sc>bs){bs=sc;bt=t;bd=d}}
+        if(bt){put(pid,bt,bd);any=true}}
+      if(!any)break}
     // שלב 4: השלמת משמרות לאגף א: קודם בוקר מהלכים כירורגיה, אחר כך בוקר אורתופדיה או מד״א
     const fillT=S.types.filter(t=>t.filler);
     if(fillT.length)for(const pid of ids.filter(p=>M().roster[p].group==='A').sort(()=>Math.random()-.5)){
