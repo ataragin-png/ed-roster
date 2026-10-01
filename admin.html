@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 43</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 44</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,7 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v13){S.v13=1;if(!S.settings.boardUrl)S.settings.boardUrl='https://docs.google.com/spreadsheets/d/1IbVJDhWcut7F37GjC4nFQNwViArzh5nvR1EhfW4eoYQ/edit?gid=1132372113#gid=1132372113';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v12){S.v12=1;if(S.settings.intWkMax===undefined)S.settings.intWkMax=0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v11){S.v11=1;for(const t of S.types){if(['k','i','o','a','z'].includes(t.code))t.noWeekend=true;if(['a','z'].includes(t.code))t.maxPer=1}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v10){S.v10=1;for(const t of S.types)if(t.code==='o'){t.restrict=true;t.qualRot='אורטופד'}
@@ -334,7 +335,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 43';
+const BUILD='1.10.2026 גרסה 44';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -915,7 +916,7 @@ function statsPanel(){
 function renderLuach(){
   const N=dim(); const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
   let h0=statsPanel();
-  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
+  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}${apiOn()&&S.settings.boardUrl?`<button class="btn small" id="bBoard">ייצא ללוח התורנויות (Google Sheets)</button>${M().exportedAt?`<span style="color:var(--muted);font-size:13px">יוצא ${new Date(M().exportedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:''}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
   for(let d=1;d<=N;d++){
     h+=`<tr class="${dayClass(d)}"><td class="num">${d}</td><td>${WD[wd(d)]}${dtype(d)&&holName(S.cur,d)?' ('+holName(S.cur,d)+')':dtype(d)==='hol'?' (חג)':dtype(d)==='eve'?' (ערב חג)':''}</td>`;
     for(const t of cols){const f=filled(t.code,d), n=need(t.code,d);h+=f.length?`<td>${esc(f.map(pname).join(', '))}</td>`:n?`<td class="miss">חסר</td>`:`<td></td>`}
@@ -973,6 +974,9 @@ function renderSettings(){
   <div class="kv"><label>כתובת השרת (Web App)<input type="text" data-rs="apiUrl" value="${esc(S.settings.apiUrl||'')}" dir="ltr" placeholder="https://script.google.com/macros/s/…/exec" style="width:min(460px,80vw)"></label>
   <label>מפתח<input type="text" data-rs="apiKey" value="${esc(S.settings.apiKey||'')}" dir="ltr" style="width:220px"></label></div>
   <div class="row" style="margin-top:10px"><button class="btn" id="bApiTest">בדוק חיבור</button></div></div>
+  <div class="panel"><h2>ייצוא ללוח התורנויות</h2><p class="hint">הגיליון שבו מציגים את התורנויות. בלחיצה על "ייצא ללוח התורנויות" בלשונית "לוח יומי", החודש נכתב בו כלשונית נפרדת בשם כמו "October 26": תאריך, יום, ועמודה לכל סוג. אפשר לקבוע כאן אילו עמודות ובאיזה סדר: שורה לכל עמודה, שם העמודה, נקודתיים, וקודי המשמרות (הקודים מופיעים בטבלת המשמרות למטה).</p>
+  <div class="kv"><label>קישור ללוח<input type="text" data-rs="boardUrl" value="${esc(S.settings.boardUrl||'')}" dir="ltr" style="width:min(460px,80vw)"></label></div>
+  <label style="display:block;margin-top:10px;font-size:13px;color:var(--muted)">עמודות<textarea id="boardCols" class="msgbox" style="min-height:150px;margin-top:4px" dir="rtl">${esc(S.settings.boardCols||BOARD_COLS_DEFAULT)}</textarea></label></div>
   <div class="panel"><h2>תוכנית ההתמחות</h2><p class="hint">קישור לגיליון Google של תוכנית ההתמחות (שורה לכל מתמחה, עמודה לכל חודש, שנה מעל כל טבלה). תכנית הסבבים באתר מתעדכנת ממנו אוטומטית.</p><div class="kv"><label>קישור<input type="text" data-rs="programUrl" value="${esc(S.settings.programUrl||'')}" dir="ltr" style="width:min(460px,80vw)"></label></div></div>
   <div class="panel"><h2>קישור לטופס המתמחים</h2><p class="hint">הקישור שמופיע בהודעת התזכורת ובהודעת היומן. אם העליתם את הטופס לאתר משלכם, הדביקו כאן את הכתובת החדשה.</p><div class="kv"><label>כתובת הטופס<input type="text" data-rs="formUrl" value="${esc(formUrl())}" dir="ltr" style="width:min(460px,80vw)"></label></div></div>
   <div class="panel"><h2>נתונים</h2><p class="hint">הנתונים נשמרים בדפדפן הזה בלבד. כדי להעביר הכול למחשב אחר או לאתר אחר (כולל הגדרות, חותמים, מאושרים ובקשות ממתינות), הורידו גיבוי מלא וטענו אותו שם.</p>
@@ -1432,6 +1436,29 @@ async function pullRequests(auto){
   }catch(e){toast('משיכת הבקשות נכשלה: '+e.message,4500)}
   finally{pulling=false}
 }
+const BOARD_COLS_DEFAULT='בוקר 1-6: m\nלילה 1-6: n\nפנימית: p\nפנימית תורן שני: c\nכירורגיה: mc, nc\nטיפול נמרץ: i\nאורתופדיה: o\nילדים: k\nבוקר צד ב: b\nתורנות צד ב: v, bv\nמד״א: a\nבוקר אורתופדיה: z\nסטאז׳ר: t';
+const ENG_M=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function boardCols(){return String(S.settings.boardCols||BOARD_COLS_DEFAULT).split(/\n/).map(l=>l.split(':')).filter(x=>x.length>1&&norm(x[0])).map(([h,c])=>({h:norm(h),c:c.split(/[\s,]+/).map(x=>x.trim()).filter(Boolean)}))}
+function boardRows(){const N=dim(),cols=boardCols();const rows=[['','יום',...cols.map(c=>c.h)]],wk=[];
+  for(let d=1;d<=N;d++){const row=[d,WD[wd(d)]];
+    for(const col of cols){const parts=[];const ppl=col.c.map(code=>({code,ps:filled(code,d)})).filter(x=>x.ps.length);
+      const all=[...new Set(ppl.flatMap(x=>x.ps))];
+      if(all.length===1||ppl.length<=1)parts.push(all.map(pname).join(' / '));
+      else parts.push(ppl.map(x=>`${x.ps.map(pname).join('+')} (${typeBy(x.code)?.short||x.code})`).join(' / '));
+      row.push(parts.join(''))}
+    rows.push(row);if(isWeekend(d))wk.push(d)}
+  return{rows,wk}}
+function boardTabName(){const[y,m]=ym();return`${ENG_M[m-1]} ${String(y).slice(2)}`}
+async function exportBoard(overwrite){
+  const st=S.settings;if(!apiOn()){toast('צריך שרת ומפתח');return}
+  const id=((st.boardUrl||'').match(/\/d\/([^/]+)/)||[])[1];if(!id){toast('אין קישור ללוח התורנויות בלשונית משמרות וכללים',4000);return}
+  const{rows,wk}=boardRows();const name=boardTabName();
+  try{const r=await fetch(st.apiUrl,{method:'POST',body:JSON.stringify({action:'exportBoard',key:st.apiKey,id,name,rows,weekend:wk,overwrite:!!overwrite})});const j=await r.json();
+    if(!j.ok){if(j.error==='exists'){if(confirm(`בלוח התורנויות כבר יש לשונית בשם "${name}". להחליף אותה בלוח הנוכחי?`))return exportBoard(true);return}
+      throw new Error(j.error==='action'?'צריך לעדכן את הקוד בגיליון לגרסה 6':j.error==='key'?'המפתח לא תואם':String(j.error))}
+    M().exportedAt=Date.now();save();render();toast(`הלוח יוצא ללשונית "${name}" בלוח התורנויות`,4500)}
+  catch(e){toast('הייצוא נכשל: '+e.message,6000)}
+}
 async function publishCalendar(){
   if(!apiOn()){calSheet();return}
   if(!M().final&&!confirm('הלוח עוד לא אושר סופית. לפרסם בכל זאת?'))return;
@@ -1631,6 +1658,7 @@ $('#main').addEventListener('click',e=>{
   if(b.id==='bCopy'){copyLuach();return}
   if(b.id==='bCal'){calSheet();return}
   if(b.id==='bPub'){publishCalendar();return}
+  if(b.id==='bBoard'){exportBoard(false);return}
   if(b.dataset.tdel!==undefined){const t=S.types[+b.dataset.tdel];if(!confirm(`למחוק את "${t.name}"? שיבוצים קיימים בקוד ${t.code} יסומנו כקוד לא מוכר.`))return;S.types.splice(+b.dataset.tdel,1);save();renderSettings();return}
   if(b.id==='bAddT'){S.types.push(T('x'+(S.types.length+1),'משמרת חדשה','חדש','duty','16:00','08:00',['A','R'],[0,0,0,0,0,0,0],'slate'));save();renderSettings();return}
   if(b.id==='bResetT'){if(!confirm('להחזיר את רשימת המשמרות לברירת המחדל?'))return;S.types=defaultTypes();save();renderSettings();return}
@@ -1670,6 +1698,8 @@ $('#main').addEventListener('change',e=>{
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
   if(el.id==='dlInput'){S.settings.req.deadlines=S.settings.req.deadlines||{};if(el.value)S.settings.req.deadlines[S.cur]=el.value;else delete S.settings.req.deadlines[S.cur];save();toast(el.value?'המועד נשמר. אחריו הטופס ננעל':'המועד בוטל');return}
   if(el.dataset.rs==='apiUrl'||el.dataset.rs==='apiKey'){const had=S.savedAt;S.settings[el.dataset.rs]=el.value.trim();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(S.settings.apiUrl&&S.settings.apiKey)loadFromServer();return}
+  if(el.dataset.rs==='boardUrl'){S.settings.boardUrl=el.value.trim();save();return}
+  if(el.id==='boardCols'){S.settings.boardCols=el.value;save();toast('העמודות נשמרו');return}
   if(el.dataset.rs==='programUrl'){S.settings.programUrl=el.value.trim();save();syncProgram(true);return}
   if(el.dataset.rs==='formUrl'){S.settings.formUrl=el.value.trim();save();return}
   if(el.dataset.rs){const k=el.dataset.rs;S.settings.req[k]=k==='deadline'?el.value.trim():(Number(el.value)||0);save();return}
