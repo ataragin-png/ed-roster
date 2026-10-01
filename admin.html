@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 46</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 47</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -336,7 +336,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 46';
+const BUILD='1.10.2026 גרסה 47';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -540,6 +540,7 @@ function evaluate(pid,t,d,ctx){
   if(t.noWeekend&&isWeekend(d)){hard=true;why.push('לא בסופ״ש')}
   if(t.internal&&isWeekend(d)&&intWkMax()!==null&&(ctx.intWk||0)>=intWkMax()){hard=true;why.push(`מקסימום ${intWkMax()} תורנויות פנימית בסופ״ש`)}
   if(t.maxPer&&Number(t.maxPer)>0&&(ctx.cc[pid][t.code]||0)>=Number(t.maxPer)){hard=true;why.push(`כבר קיבל ${t.short} החודש`)}
+  if(isMorn(t)&&!isNight(t)){const md=new Set(ctx.iv[pid].filter(y=>!y.ni&&(y.s%1440)<720).map(y=>y.d));if((md.has(d-1)&&md.has(d-2))||(md.has(d-1)&&md.has(d+1))||(md.has(d+1)&&md.has(d+2))){score-=14;why.push('בוקר שלישי ברצף')}}
   if(isNight(t)){const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2))){hard=true;why.push('שלושה לילות ברצף')}}
   if(sigReqOn(t,d)&&!isSigner(pid)){hard=true;why.push('ביום הזה נדרש חותם שחרור')}
   if(t.internal){if(isSigner(pid)){if(t.forSigners){score+=6;why.push('חותם, עדיף במהלכים')}else score-=6}else if(t.forSigners)score-=4}
@@ -660,6 +661,7 @@ function autofill(){
     for(const pid of ids){const c=ctx.cnt[pid],tg=ctx.tgt[pid],g=M().roster[pid].group;cost+=8*((tg.S-c.shift)**2+(tg.D-c.duty)**2);
       if(g==='X')continue;const G=ctx.gs[g],fr=ctx.frac[pid];for(const [k,wt] of [['mo',3],['ni',3],['wk',6]]){const e=G.f?G[k]/G.f*fr:0;cost+=wt*(c[k]-e)**2}}
     for(const pid of ids){const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));for(const d of nd)if(nd.has(d+1))cost+=6}
+    for(const pid of ids){if(homeOf(pid))continue;const md=new Set(ctx.iv[pid].filter(y=>!y.ni&&(y.s%1440)<720).map(y=>y.d));for(const d of md)if(md.has(d+1)&&md.has(d+2))cost+=15}
     for(const pid of ids){if(!rulesOf(pid).shabbat||M().roster[pid].group!=='A')continue;const ds=new Set(ctx.iv[pid].map(y=>y.d));
       for(let d=1;d<=N;d++){if(d+1>N||!(isFriLike(d)&&(wd(d+1)===6||dtype(d+1)==='hol')))continue;const a=ds.has(d),b=ds.has(d+1);if(a!==b)cost+=25}}
     {const fb=ids.filter(p=>M().roster[p].group==='R'&&!homeOf(p)&&!isICU(p));const mean=fb.reduce((a,p)=>a+ctx.cnt[p].day,0)/Math.max(fb.length,1);for(const p of fb)cost+=4*(ctx.cnt[p].day-mean)**2;
