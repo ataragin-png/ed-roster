@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 44</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 45</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,7 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v14){S.v14=1;if(S.settings.boardCols)S.settings.boardCols=S.settings.boardCols.replace(/^\s*כירורגיה\s*:\s*mc[\s,]+nc\s*$/m,'כירורגיה בוקר: mc\nכירורגיה ערב: nc');try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v13){S.v13=1;if(!S.settings.boardUrl)S.settings.boardUrl='https://docs.google.com/spreadsheets/d/1IbVJDhWcut7F37GjC4nFQNwViArzh5nvR1EhfW4eoYQ/edit?gid=1132372113#gid=1132372113';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v12){S.v12=1;if(S.settings.intWkMax===undefined)S.settings.intWkMax=0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v11){S.v11=1;for(const t of S.types){if(['k','i','o','a','z'].includes(t.code))t.noWeekend=true;if(['a','z'].includes(t.code))t.maxPer=1}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -335,7 +336,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 44';
+const BUILD='1.10.2026 גרסה 45';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -1436,7 +1437,7 @@ async function pullRequests(auto){
   }catch(e){toast('משיכת הבקשות נכשלה: '+e.message,4500)}
   finally{pulling=false}
 }
-const BOARD_COLS_DEFAULT='בוקר 1-6: m\nלילה 1-6: n\nפנימית: p\nפנימית תורן שני: c\nכירורגיה: mc, nc\nטיפול נמרץ: i\nאורתופדיה: o\nילדים: k\nבוקר צד ב: b\nתורנות צד ב: v, bv\nמד״א: a\nבוקר אורתופדיה: z\nסטאז׳ר: t';
+const BOARD_COLS_DEFAULT='בוקר 1-6: m\nלילה 1-6: n\nפנימית: p\nפנימית תורן שני: c\nכירורגיה בוקר: mc\nכירורגיה ערב: nc\nטיפול נמרץ: i\nאורתופדיה: o\nילדים: k\nבוקר צד ב: b\nתורנות צד ב: v, bv\nמד״א: a\nבוקר אורתופדיה: z\nסטאז׳ר: t';
 const ENG_M=['January','February','March','April','May','June','July','August','September','October','November','December'];
 function boardCols(){return String(S.settings.boardCols||BOARD_COLS_DEFAULT).split(/\n/).map(l=>l.split(':')).filter(x=>x.length>1&&norm(x[0])).map(([h,c])=>({h:norm(h),c:c.split(/[\s,]+/).map(x=>x.trim()).filter(Boolean)}))}
 function boardRows(){const N=dim(),cols=boardCols();const rows=[['','יום',...cols.map(c=>c.h)]],wk=[];
