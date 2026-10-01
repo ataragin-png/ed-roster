@@ -699,6 +699,7 @@ function renderGrid(){
   if(A.errs)h+=`<span class="pill bad">${A.errs} שגיאות</span>`;
   if(A.warns)h+=`<span class="pill mid">${A.warns} אזהרות</span>`;
   if(S.types.some(t=>t.signer))h+=A.noSig.length?`<span class="pill bad" title="${A.noSig.join(', ')}">${A.noSig.length} לילות בלי חותם שחרור</span>`:`<span class="pill good">יש חותם שחרור בכל לילה</span>`;
+  {const act=ids.filter(p=>M().roster[p].group!=='X');const td=act.reduce((a,p)=>a+A.per[p].cnt.duty,0),tdT=act.reduce((a,p)=>a+A.per[p].tgt.D,0),tw=act.reduce((a,p)=>a+A.per[p].cnt.wk.size,0);h+=`<span class="pill" title="סך התורנויות של כל המתמחים החודש, מול סך המכסות">סה״כ תורנויות ${td} מתוך ${tdT}</span><span class="pill" title="סך ימי סופ״ש וחג שכל המתמחים עובדים החודש">סה״כ ימי סופ״ש ${tw}</span>`}
   {const pc=['o','k','i'].map(c=>{const t=typeBy(c);return t?`${t.short} ${countIn(S.cur,c)}`:''}).filter(Boolean).join(', ');h+=`<span class="pill" title="תורנויות החודש: אורתופדיה, ילדים, טיפול נמרץ">${pc}</span>`}
   h+=balSummary(A);
   h+=`</div>`;
@@ -724,6 +725,8 @@ function renderGrid(){
     }
     h+=`</tr>`;
   }
+  {const act=ids.filter(p=>M().roster[p].group!=='X');const sm=k=>act.reduce((a,p)=>a+(k==='wk'?A.per[p].cnt.wk.size:A.per[p].cnt[k]),0);
+    h+=`<tr class="cov" style="font-weight:700"><td class="namecol">סה״כ</td><td class="stat num">${sm('shift')}</td><td class="stat num">${sm('duty')}</td><td class="stat num">${sm('mo')}</td><td class="stat num">${sm('ni')}</td><td class="stat num">${sm('wk')}</td><td colspan="${N}"></td></tr>`}
   const covTypes=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
   h+=`<tr class="covhead"><td class="namecol" colspan="6">כיסוי יומי</td><td colspan="${N}"></td></tr>`;
   for(const t of covTypes){
@@ -890,8 +893,11 @@ function statsPanel(){
   for(const t of types)h+=`<tr style="${hi(t.code)?'font-weight:700':''}"><td><span class="chip c-${t.color}">${esc(t.short)}</span> ${esc(t.name)}</td>${keys.map(k=>`<td class="num">${countIn(k,t.code)||'–'}</td>`).join('')}</tr>`;
   h+=`</tbody></table></div>`;
   const ids=rosterIds().filter(p=>M().roster[p].group!=='X');
-  const per=ids.map(p=>({p,o:0,k:0,i:0})).map(x=>{for(let d=1;d<=dim();d++)for(const c of cellOf(x.p,d).c)if(c in x)x[c]++;return x}).filter(x=>x.o||x.k||x.i);
-  if(per.length)h+=`<h4>לפי מתמחה ב${kLabel(S.cur)}</h4><div class="tablewrap"><table class="form" style="width:auto"><thead><tr><th>שם</th><th>אורטופדיה</th><th>ילדים</th><th>טיפול נמרץ</th></tr></thead><tbody>${per.map(x=>`<tr><td>${esc(pname(x.p))}</td><td class="num">${x.o||''}</td><td class="num">${x.k||''}</td><td class="num">${x.i||''}</td></tr>`).join('')}</tbody></table></div>`;
+  const A=analyze();
+  const per=ids.map(p=>{const x={p,o:0,k:0,i:0};for(let d=1;d<=dim();d++)for(const c of cellOf(p,d).c)if(c in x)x[c]++;x.S=A.per[p].cnt.shift;x.D=A.per[p].cnt.duty;x.tD=A.per[p].tgt.D;x.wk=A.per[p].cnt.wk.size;return x});
+  const tot=k=>per.reduce((a,x)=>a+x[k],0);
+  h+=`<h4>לפי מתמחה ב${kLabel(S.cur)}</h4><div class="tablewrap"><table class="form" style="width:auto"><thead><tr><th>שם</th><th>משמרות</th><th>תורנויות</th><th>מתוכן אורטופדיה</th><th>ילדים</th><th>טיפול נמרץ</th><th>ימי סופ״ש וחג</th></tr></thead><tbody>${per.map(x=>`<tr><td>${esc(pname(x.p))}</td><td class="num">${x.S||''}</td><td class="num">${x.D}/${x.tD}</td><td class="num">${x.o||''}</td><td class="num">${x.k||''}</td><td class="num">${x.i||''}</td><td class="num">${x.wk}</td></tr>`).join('')}
+  <tr style="font-weight:700;border-top:2px solid var(--line)"><td>סה״כ</td><td class="num">${tot('S')}</td><td class="num">${tot('D')}/${tot('tD')}</td><td class="num">${tot('o')}</td><td class="num">${tot('k')}</td><td class="num">${tot('i')}</td><td class="num">${tot('wk')}</td></tr></tbody></table></div>`;
   return h+`</div>`;
 }
 function renderLuach(){
