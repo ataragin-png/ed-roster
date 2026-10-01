@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 41</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 42</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,7 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v12){S.v12=1;if(S.settings.intWkMax===undefined)S.settings.intWkMax=0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v11){S.v11=1;for(const t of S.types){if(['k','i','o','a','z'].includes(t.code))t.noWeekend=true;if(['a','z'].includes(t.code))t.maxPer=1}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v10){S.v10=1;for(const t of S.types)if(t.code==='o'){t.restrict=true;t.qualRot='אורטופד'}
   const AL={'יוני י':'יעקובוביץ','טבקמן':'טאבקמן','דוד':'דוד ט','חיגאזי':"חג'אזי"};for(const p of S.people){const a=AL[p.name.trim()];if(a&&!p.sheetName)p.sheetName=a}
@@ -333,7 +334,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 41';
+const BUILD='1.10.2026 גרסה 42';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -394,6 +395,7 @@ function isMorn(t){return hm(t.start)<720}
 function isNight(t){return hm(t.end)<=hm(t.start)}
 function availFrac(pid){return Math.max(0.15,1-vacDays(pid)/dim())}
 function isSigner(pid){const p=person(pid);return!!(p&&p.signer)&&M().roster[pid]&&M().roster[pid].group!=='X'}
+function intWkMax(){const v=S.settings.intWkMax;return v===''||v===undefined||v===null||isNaN(v)?null:Number(v)}
 function sigWhy(d){const out=[];for(const p of rosterIds()){if(!person(p).signer)continue;const r=M().roster[p];const cs=cellOf(p,d).c.map(typeBy).filter(Boolean);
   if(r.group==='X'&&cs.length)out.push(`${pname(p)} רשום כלא זמין החודש`);else{const night=cs.filter(t=>isNight(t)&&!t.signer);if(night.length)out.push(`${pname(p)} ב${night[0].name}, שלא נחשבת לכיסוי חותם`)}}
   return out.length?'. '+out.join('; '):''}
@@ -486,6 +488,7 @@ function analyze(){
   for(const loc in byLoc){const L=byLoc[loc].sort((a,b)=>a.s-b.s);
     for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length&&L[j].s<L[i].e;j++){const a=L[i],b=L[j];if(a.pid===b.pid)continue;
       const msg=`שני אנשים ב${loc} באותו זמן: ${pname(a.pid)} ו${pname(b.pid)}`;add(a.pid,a.d,'err',msg);add(b.pid,b.d,'err',msg);clash.push(b.d)}}
+  {const mx=intWkMax();if(mx!==null){let c=0;for(let d=1;d<=N;d++)if(isWeekend(d))for(const t of S.types)if(t.internal)for(const p of filled(t.code,d)){c++;if(c>mx)add(p,d,'warn',`יותר מ־${mx} תורנויות פנימית בסופ״ש`)}}}
   const noSig=[];for(let d=1;d<=N;d++)if(sigDay(d)&&!signersOn(d).length)noSig.push(d);
   let errs=0,warns=0;for(const k in issues)issues[k].lvl==='err'?errs++:warns++;
   return{per,issues,missing,missList,errs,warns,noSig,clash};
@@ -502,6 +505,7 @@ function buildCtx(){
       if(cl.c.length&&isWeekend(d))ctx.cnt[pid].wk++}
     const g=ctx.gs[M().roster[pid].group],c=ctx.cnt[pid];g.mo+=c.mo;g.ni+=c.ni;g.wk+=c.wk;g.f+=ctx.frac[pid];
   }
+  ctx.intWk=0;for(let d=1;d<=dim();d++)if(isWeekend(d))for(const t of S.types)if(t.internal)ctx.intWk+=filled(t.code,d).length;
   return ctx;
 }
 function evaluate(pid,t,d,ctx){
@@ -531,6 +535,7 @@ function evaluate(pid,t,d,ctx){
   if(t.kind==='day'){const h=homeOf(pid);if(h===t.code){score+=15;why.push('הבוקר הקבוע שלו')}else if(h===''&&t.code==='b'){score-=6+3*c.day;if(isICU(pid)){score-=10;why.push('ב־ICU, עדיף שלא')}if(c.day)why.push(`כבר מילא ${c.day} בקרים`)}}
   if(wkndMorning(t,d)&&!cl0.c.includes('v')){hard=true;why.push('בסופ״ש בוקר צד ב עושה התורן')}
   if(t.noWeekend&&isWeekend(d)){hard=true;why.push('לא בסופ״ש')}
+  if(t.internal&&isWeekend(d)&&intWkMax()!==null&&(ctx.intWk||0)>=intWkMax()){hard=true;why.push(`מקסימום ${intWkMax()} תורנויות פנימית בסופ״ש`)}
   if(t.maxPer&&Number(t.maxPer)>0&&(ctx.cc[pid][t.code]||0)>=Number(t.maxPer)){hard=true;why.push(`כבר קיבל ${t.short} החודש`)}
   if(isNight(t)){const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2))){hard=true;why.push('שלושה לילות ברצף')}}
   if(sigReqOn(t,d)&&!isSigner(pid)){hard=true;why.push('ביום הזה נדרש חותם שחרור')}
@@ -547,9 +552,9 @@ function evaluate(pid,t,d,ctx){
   if(isWeekend(d)&&!ctx.days[pid].has(d)){score-=4*dev('wk');if(c.wk)why.push(`${c.wk} סופ״ש/חג`)}
   return{hard,why,score};
 }
-function commit(ctx,pid,t,d){const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||0)+1;ctx.iv[pid].push({d,...x,ni:isNight(t),k:t.kind});if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x});addUnits(c,pid,t,d,1);if(isMorn(t)){c.mo++;G.mo++}if(isNight(t)){c.ni++;G.ni++}if(isWeekend(d)&&!ctx.days[pid].has(d)){c.wk++;G.wk++}ctx.days[pid].add(d)}
+function commit(ctx,pid,t,d){if(t.internal&&isWeekend(d))ctx.intWk=(ctx.intWk||0)+1;const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||0)+1;ctx.iv[pid].push({d,...x,ni:isNight(t),k:t.kind});if(t.loc)(ctx.occ[t.loc]=ctx.occ[t.loc]||[]).push({pid,...x});addUnits(c,pid,t,d,1);if(isMorn(t)){c.mo++;G.mo++}if(isNight(t)){c.ni++;G.ni++}if(isWeekend(d)&&!ctx.days[pid].has(d)){c.wk++;G.wk++}ctx.days[pid].add(d)}
 
-function uncommit(ctx,pid,t,d){const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||1)-1;
+function uncommit(ctx,pid,t,d){if(t.internal&&isWeekend(d))ctx.intWk--;const x=iv(t.code,d),c=ctx.cnt[pid],G=ctx.gs[M().roster[pid].group];ctx.cc[pid][t.code]=(ctx.cc[pid][t.code]||1)-1;
   const i=ctx.iv[pid].findIndex(y=>y.d===d&&y.s===x.s&&y.e===x.e);if(i>=0)ctx.iv[pid].splice(i,1);addUnits(c,pid,t,d,-1);if(isMorn(t)){c.mo--;G.mo--}if(isNight(t)){c.ni--;G.ni--}
   if(t.loc&&ctx.occ[t.loc]){const j=ctx.occ[t.loc].findIndex(y=>y.pid===pid&&y.s===x.s);if(j>=0)ctx.occ[t.loc].splice(j,1)}
   if(!ctx.iv[pid].some(y=>y.d===d)){ctx.days[pid].delete(d);if(isWeekend(d)){c.wk--;G.wk--}}}
@@ -693,7 +698,7 @@ function renderGrid(){
   const A=analyze(), N=dim(), ids=rosterIds();
   let h=`<div class="status">`+(M().final?`<span class="pill good">הלוח אושר סופית ב־${new Date(M().final).toLocaleDateString('he-IL')}</span><button class="btn small" id="inReopen">פתח לעריכה</button>`:`<span class="pill">הלוח בבנייה</span><button class="btn small primary" id="inFinalize">אשר את הלוח סופית</button>`);
   h+=A.missing?`<span class="pill bad">${A.missing} משבצות חובה חסרות</span>`:`<span class="pill good">כל משבצות החובה מאוישות</span>`;
-  {const ic=internalCount(),im=S.settings.intMin||0;let iw=0;for(let d=1;d<=dim();d++)if(isWeekend(d))for(const t of S.types)if(t.internal)iw+=filled(t.code,d).length;if(im)h+=`<span class="pill ${ic<im?'bad':'good'}" title="תורנויות צד ג ומהלכים פנימית בחודש">פנימית ${ic} (מינימום ${im}), מתוכן ${iw} בסופ״ש</span>`}
+  {const ic=internalCount(),im=S.settings.intMin||0;let iw=0;for(let d=1;d<=dim();d++)if(isWeekend(d))for(const t of S.types)if(t.internal)iw+=filled(t.code,d).length;if(im)h+=`<span class="pill ${ic<im?'bad':'good'}" title="תורנויות צד ג ומהלכים פנימית בחודש">פנימית ${ic} (מינימום ${im}), מתוכן ${iw} בסופ״ש${intWkMax()!==null?` (מקס׳ ${intWkMax()})`:''}</span>`}
   if(A.errs)h+=`<span class="pill bad">${A.errs} שגיאות</span>`;
   if(A.warns)h+=`<span class="pill mid">${A.warns} אזהרות</span>`;
   if(S.types.some(t=>t.signer))h+=A.noSig.length?`<span class="pill bad" title="${A.noSig.join(', ')}">${A.noSig.length} לילות בלי חותם שחרור</span>`:`<span class="pill good">יש חותם שחרור בכל לילה</span>`;
@@ -923,6 +928,7 @@ function renderSettings(){
   <label>מנוחה מינימלית (שעות)<input type="number" data-s="minRest" value="${st.minRest}"></label>
   <label>רצף מקסימלי (שעות)<input type="number" data-s="maxCont" value="${st.maxCont}"></label>
   <label>מינימום תורנויות פנימית בחודש<input type="number" data-s="intMin" value="${st.intMin??15}"></label>
+  <label>מקסימום תורנויות פנימית בסופ״ש (ריק = ללא הגבלה)<input type="number" min="0" id="intWkMax" value="${st.intWkMax??''}"></label>
   <label style="flex-direction:row;align-items:center;gap:6px;max-width:320px"><input type="checkbox" id="surg24" ${st.surg24===false?'':'checked'} style="width:auto"> כשחסר בוקר מהלכים כירורגיה, לשבץ 24 שעות (בוקר+ערב) כתורנות</label></div>
   <p class="hint" style="margin-top:12px">סדר המילוי האוטומטי: קודם משבצות החובה בכל יום (אגף א, צד ב, מהלכים לילה ומה שמסומן בימים), אחר כך מכסת הפנימית (צד ג ומהלכים פנימית), אחר כך השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה או ילדים (רק למאושרים, רק בימי חול), ותורנויות שנשארו עוברות לפנימית, ובסוף, למתמחי אגף א שעדיין חסרות להם משמרות (לא בגלל חופשה), בוקר אורתופדיה או מד״א בימי חול, לכל היותר אחד מכל אחד לכל מתמחה בחודש. בוקר מהלכים כירורגיה הוא משבצת חובה בראשון עד חמישי, אבל מאויש אחרון מבין משבצות החובה, כך שאם חסרים אנשים, החוסר נופל עליו ולא על אגף א.</p></div>`;
   h+=`<div class="panel"><h2>סוגי משמרות</h2><p class="hint">הקודים זהים לקודים בגיליון הבקשות. בכל מקום יכול לעבוד רק אדם אחד בכל רגע, לכן משמרות שחופפות בזמן ובמקום לא ישובצו לשני אנשים. מתמחה שעושה בוקר וערב מהלכים כירורגיה באותו יום (24 שעות), ברוטציה או באגף א, נספר לו כתורנות אחת. סמנו לאיזו קבוצה כל משמרת מתאימה, באילו משמרות חותם שחרור מכסה את הלילה, ובאילו ימים היא נדרשת (ערב חג נחשב כשישי, חג נחשב כשבת). אפשר גם להדליק או לכבות דרישה ליום בודד מלחיצה על שורת הכיסוי בלוח.</p><div class="tablewrap"><table class="form"><thead><tr><th>קוד</th><th>שם</th><th>קיצור</th><th title="בכל מקום יכול להיות רק אדם אחד בכל רגע. ריק = ללא הגבלה">מקום</th><th>סוג</th><th>משעה</th><th>עד</th><th>אגף א</th><th>סבב</th><th title="חותם שחרור במשמרת הזו מכסה את הלילה">חותם בלילה</th><th title="נספר במכסת הפנימית החודשית">פנימית</th><th title="בפנימית: חותם שחרור ישובץ עדיף כאן">פנימית לחותמים</th><th title="משלים משמרות למתמחי אגף א שלא הגיעו למכסה">משלים לאגף א</th><th title="לא משובץ בשישי, שבת, ערב חג וחג">לא בסופ״ש</th><th title="לכל היותר כך וכך פעמים לכל מתמחה בחודש. ריק = ללא הגבלה">מקס׳ בחודש</th><th title="משובץ בשלב ההשלמה, אחרי החובה והפנימית">השלמה</th><th title="רק מתמחים מאושרים יכולים להיות משובצים">דורש אישור</th><th>נדרש בימים</th><th title="בימים המסומנים רק חותם שחרור יכול לקבל את המשמרת">חותם חובה בימים</th><th>צבע</th><th></th></tr></thead><tbody>`;
@@ -1653,6 +1659,7 @@ $('#main').addEventListener('change',e=>{
     else r[f]=el.value;
     if(f==='group'||f==='rot'){S.rotPlan=S.rotPlan||{};S.rotPlanManual=S.rotPlanManual||{};const lab=r.group==='A'?'מלר״ד':r.group==='X'?(r.rot&&r.rot!=='אגף א'?r.rot:'לא פעיל'):(r.rot&&r.rot!=='אגף א'?r.rot:'רוטציה');(S.rotPlan[pid]=S.rotPlan[pid]||{})[S.cur]=lab;S.rotPlanManual[pid+'|'+S.cur]=true;if(M().removed)delete M().removed[pid]}
     save();if(f==='group'||f==='extraVac'||f==='tS'||f==='tD')renderPeople();return}
+  if(el.id==='intWkMax'){S.settings.intWkMax=el.value===''?'':Number(el.value);save();return}
   if(el.id==='surg24'){S.settings.surg24=el.checked;save();return}
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
   if(el.id==='dlInput'){S.settings.req.deadlines=S.settings.req.deadlines||{};if(el.value)S.settings.req.deadlines[S.cur]=el.value;else delete S.settings.req.deadlines[S.cur];save();toast(el.value?'המועד נשמר. אחריו הטופס ננעל':'המועד בוטל');return}
