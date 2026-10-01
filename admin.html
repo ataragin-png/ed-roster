@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px"></p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 41</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -333,7 +333,8 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el)el.textContent=t}
+const BUILD='1.10.2026 גרסה 41';
+function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
   const saveCur=S.cur;S.cur=key;try{
@@ -759,7 +760,8 @@ function ensurePlanNames(){const n=new Date(),nowKey=`${n.getFullYear()}-${pad2(
 function personData(pid){let n=0;for(const k in S.months){const mo=S.months[k];if(mo.roster[pid]&&(mo.roster[pid].reqAt||mo.roster[pid].notes))n+=5;for(const c in mo.cells)if(c.startsWith(pid+'|'))n++}if(S.rotPlan&&S.rotPlan[pid])n+=Object.keys(S.rotPlan[pid]).length;return n}
 function findDups(){const g={};for(const p of S.people){const k=nameKey(p.name);if(!k)continue;(g[k]=g[k]||[]).push(p)}
   const out=Object.values(g).filter(a=>a.length>1).map(a=>({sure:true,list:a}));
-  const keys=Object.keys(g);for(let i=0;i<keys.length;i++)for(let j=0;j<keys.length;j++){if(i===j)continue;const a=keys[i],b=keys[j];if(a.length>=3&&b.length>a.length&&b.startsWith(a))out.push({sure:false,list:[...g[a],...g[b]]})}
+  const lev=(a,b)=>{if(Math.abs(a.length-b.length)>1)return 9;const dp=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let prev=dp[0];dp[0]=i;for(let j=1;j<=b.length;j++){const t=dp[j];dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=t}}return dp[b.length]};
+  const keys=Object.keys(g);for(let i=0;i<keys.length;i++)for(let j=i+1;j<keys.length;j++){const a=keys[i],b=keys[j];if(Math.min(a.length,b.length)>=3&&((a.length!==b.length&&(a.startsWith(b)||b.startsWith(a)))||lev(a,b)===1))out.push({sure:false,list:[...g[a],...g[b]]})}
   return out}
 function mergePeople(keepId,dropId){if(keepId===dropId)return;
   for(const k in S.months){const mo=S.months[k];
@@ -822,11 +824,13 @@ async function syncProgram(manual){
   try{const r=await fetch(st.apiUrl+'?action=program&key='+encodeURIComponent(st.apiKey)+'&id='+encodeURIComponent(id)+'&gid='+gid);const j=await r.json();
     if(!j.ok)throw new Error(j.error==='action'?'צריך לעדכן את הקוד בגיליון לגרסה 5':j.error==='key'?'המפתח לא תואם':String(j.error));
     const rows=parseProgram(j.values||[]);S.rotPlan=S.rotPlan||{};S.rotPlanManual=S.rotPlanManual||{};
-    const n=new Date(),nowKey=`${n.getFullYear()}-${pad2(n.getMonth()+1)}`;let changed=0;const unmatched={};
+    const n=new Date(),nowKey=`${n.getFullYear()}-${pad2(n.getMonth()+1)}`;let changed=0;const unmatched={},seenPid=new Set(),sheetKeys={};
     for(const row of rows){const p=personForSheet(row.name);
       if(!p){const fut=Object.keys(row.entries).filter(k=>k>=nowKey);if(fut.length)unmatched[row.name]=fut.sort()[0];continue}
       const pl=S.rotPlan[p.id]=S.rotPlan[p.id]||{};
-      for(const k in row.entries){if(S.rotPlanManual[p.id+'|'+k])continue;if(pl[k]!==row.entries[k]){pl[k]=row.entries[k];changed++}}}
+      for(const k in row.entries){if(S.rotPlanManual[p.id+'|'+k])continue;if(pl[k]!==row.entries[k]){pl[k]=row.entries[k];changed++}}
+      seenPid.add(p.id);(sheetKeys[p.id]=sheetKeys[p.id]||new Set());for(const k in row.entries)sheetKeys[p.id].add(k)}
+    for(const pid of seenPid){const pl=S.rotPlan[pid]||{};for(const k of Object.keys(pl)){if(!sheetKeys[pid].has(k)&&!S.rotPlanManual[pid+'|'+k]){delete pl[k];changed++}}}
     let applied=0;for(const k in S.months)if(!S.months[k].final)applied+=applyPlan(k);
     S.progSync={ts:Date.now(),unmatched};save();if(tab==='people')renderPeople();
     if(manual||changed)toast(`תוכנית ההתמחות סונכרנה${changed?`: ${changed} שינויים`:''}${applied?`, עודכנו ${applied} שיבוצי קבוצה`:''}`,4000)}
@@ -1647,6 +1651,7 @@ $('#main').addEventListener('change',e=>{
     else if(f==='signer'){person(pid).signer=el.checked}
     else if(f==='home'){r.home=el.value}
     else r[f]=el.value;
+    if(f==='group'||f==='rot'){S.rotPlan=S.rotPlan||{};S.rotPlanManual=S.rotPlanManual||{};const lab=r.group==='A'?'מלר״ד':r.group==='X'?(r.rot&&r.rot!=='אגף א'?r.rot:'לא פעיל'):(r.rot&&r.rot!=='אגף א'?r.rot:'רוטציה');(S.rotPlan[pid]=S.rotPlan[pid]||{})[S.cur]=lab;S.rotPlanManual[pid+'|'+S.cur]=true;if(M().removed)delete M().removed[pid]}
     save();if(f==='group'||f==='extraVac'||f==='tS'||f==='tD')renderPeople();return}
   if(el.id==='surg24'){S.settings.surg24=el.checked;save();return}
   if(el.dataset.s){S.settings[el.dataset.s]=Number(el.value)||0;save();return}
