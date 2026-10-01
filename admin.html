@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 51</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 52</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,12 +312,13 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v16){S.v16=1;for(const t of S.types)if(t.qualRot==='אורטופד')t.qualRot='אור[טת]ופד';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v15){S.v15=1;const bs=S.people.find(p=>nameKey(p.name)===nameKey('בת שבע'));if(bs){bs.rules=bs.rules||{};bs.rules.noCodes=[...new Set([...(bs.rules.noCodes||[]),'i'])]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v14){S.v14=1;if(S.settings.boardCols)S.settings.boardCols=S.settings.boardCols.replace(/^\s*כירורגיה\s*:\s*mc[\s,]+nc\s*$/m,'כירורגיה בוקר: mc\nכירורגיה ערב: nc');try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v13){S.v13=1;if(!S.settings.boardUrl)S.settings.boardUrl='https://docs.google.com/spreadsheets/d/1IbVJDhWcut7F37GjC4nFQNwViArzh5nvR1EhfW4eoYQ/edit?gid=1132372113#gid=1132372113';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v12){S.v12=1;if(S.settings.intWkMax===undefined)S.settings.intWkMax=0;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v11){S.v11=1;for(const t of S.types){if(['k','i','o','a','z'].includes(t.code))t.noWeekend=true;if(['a','z'].includes(t.code))t.maxPer=1}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-if(!S.v10){S.v10=1;for(const t of S.types)if(t.code==='o'){t.restrict=true;t.qualRot='אורטופד'}
+if(!S.v10){S.v10=1;for(const t of S.types)if(t.code==='o'){t.restrict=true;t.qualRot='אור[טת]ופד'}
   const AL={'יוני י':'יעקובוביץ','טבקמן':'טאבקמן','דוד':'דוד ט','חיגאזי':"חג'אזי"};for(const p of S.people){const a=AL[p.name.trim()];if(a&&!p.sheetName)p.sheetName=a}
   if(!S.settings.programUrl)S.settings.programUrl='https://docs.google.com/spreadsheets/d/1tHLsrjRMdTiqh6kVVxAhoo1DD3oOSdf6LfArxzfiHZI/edit?gid=0#gid=0';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v9){S.v9=1;const ab=S.people.find(p=>p.name.trim()==='אברהם');if(ab&&!ab.rules)ab.rules={rotD:4,shabbat:true,friLong:'two'};try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -337,7 +338,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 51';
+const BUILD='1.10.2026 גרסה 52';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -831,7 +832,7 @@ function importPlanText(txt){
 }
 function cleanName(x){return norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,' ').trim()}
 function personForSheet(sn){const c=cleanName(sn);if(!c)return null;
-  const hit=S.people.find(p=>p.sheetName&&cleanName(p.sheetName)===c)||S.people.find(p=>!p.sheetName&&cleanName(p.name)===c);if(hit)return hit;
+  const hit=S.people.find(p=>p.sheetName&&cleanName(p.sheetName)===c)||S.people.find(p=>!p.sheetName&&cleanName(p.name)===c)||S.people.find(p=>p.sheetName&&nameKey(p.sheetName)===nameKey(sn))||S.people.find(p=>!p.sheetName&&nameKey(p.name)===nameKey(sn));if(hit)return hit;
   const al=(S.nameAliases||{})[nameKey(sn)];return al?person(al)||null:null}
 function parseProgram(vals){let mc=null,year=null;const out=[];
   for(const row of vals){const cells=row.map(x=>norm(x));const m={};cells.forEach((c,i)=>{const mi=HEB_MONTHS.indexOf(c);if(mi>=0&&!(mi in m))m[mi]=i});
