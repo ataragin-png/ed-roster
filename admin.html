@@ -698,6 +698,7 @@ function renderGrid(){
   if(A.errs)h+=`<span class="pill bad">${A.errs} שגיאות</span>`;
   if(A.warns)h+=`<span class="pill mid">${A.warns} אזהרות</span>`;
   if(S.types.some(t=>t.signer))h+=A.noSig.length?`<span class="pill bad" title="${A.noSig.join(', ')}">${A.noSig.length} לילות בלי חותם שחרור</span>`:`<span class="pill good">יש חותם שחרור בכל לילה</span>`;
+  {const pc=['o','k','i'].map(c=>{const t=typeBy(c);return t?`${t.short} ${countIn(S.cur,c)}`:''}).filter(Boolean).join(', ');h+=`<span class="pill" title="תורנויות החודש: אורתופדיה, ילדים, טיפול נמרץ">${pc}</span>`}
   h+=balSummary(A);
   h+=`</div>`;
   h+=`<div class="legend"><span><i class="sw mk-vac"></i>חופש</span><span><i class="sw" style="background:linear-gradient(145deg,transparent 45%,var(--muted) 46% 54%,transparent 55%)"></i>חסימה</span><span><i class="sw" style="border-radius:50%;background:var(--warn);width:8px;height:8px;border:0"></i>מעדיף שלא</span><span><i class="sw" style="border-radius:50%;background:var(--ok);width:8px;height:8px;border:0"></i>מבקש לעבוד</span><span><i class="sw" style="background:var(--wk)"></i>סופ״ש</span><span><i class="sw" style="background:var(--eve)"></i>ערב חג</span><span><i class="sw" style="background:var(--hol)"></i>חג</span><span>לחיצה על תאריך משנה את סוג היום</span></div>`;
@@ -873,8 +874,22 @@ function renderPeople(){
   $('#main').innerHTML=h;
 }
 
+const STAT_CODES=['o','k','i','p','c','v','bv','mc','nc'];
+function countIn(key,code){const mo=S.months[key];if(!mo)return 0;let n=0;for(const k in mo.cells){const id=k.split('|')[0];if(!mo.roster[id])continue;if(mo.cells[k].c.includes(code))n++}return n}
+function statsPanel(){
+  const keys=Object.keys(S.months).sort().slice(-8),types=STAT_CODES.map(typeBy).filter(Boolean);
+  const hi=c=>['o','k','i'].includes(c);
+  let h=`<div class="panel"><h2>כמה תורנויות נותנים בכל חודש</h2><p class="hint">ספירה לפי סוג משמרת. בקו מודגש: אורתופדיה, ילדים וטיפול נמרץ. 24 שעות במהלכים כירורגיה מופיע גם בבוקר וגם בערב.</p><div class="tablewrap"><table class="form"><thead><tr><th>סוג</th>${keys.map(k=>`<th class="${k===S.cur?'okc':''}">${kLabel(k)}${S.months[k].final?' ✓':''}</th>`).join('')}</tr></thead><tbody>`;
+  for(const t of types)h+=`<tr style="${hi(t.code)?'font-weight:700':''}"><td><span class="chip c-${t.color}">${esc(t.short)}</span> ${esc(t.name)}</td>${keys.map(k=>`<td class="num">${countIn(k,t.code)||'–'}</td>`).join('')}</tr>`;
+  h+=`</tbody></table></div>`;
+  const ids=rosterIds().filter(p=>M().roster[p].group!=='X');
+  const per=ids.map(p=>({p,o:0,k:0,i:0})).map(x=>{for(let d=1;d<=dim();d++)for(const c of cellOf(x.p,d).c)if(c in x)x[c]++;return x}).filter(x=>x.o||x.k||x.i);
+  if(per.length)h+=`<h4>לפי מתמחה ב${kLabel(S.cur)}</h4><div class="tablewrap"><table class="form" style="width:auto"><thead><tr><th>שם</th><th>אורטופדיה</th><th>ילדים</th><th>טיפול נמרץ</th></tr></thead><tbody>${per.map(x=>`<tr><td>${esc(pname(x.p))}</td><td class="num">${x.o||''}</td><td class="num">${x.k||''}</td><td class="num">${x.i||''}</td></tr>`).join('')}</tbody></table></div>`;
+  return h+`</div>`;
+}
 function renderLuach(){
   const N=dim(); const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
+  let h0=statsPanel();
   let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
   for(let d=1;d<=N;d++){
     h+=`<tr class="${dayClass(d)}"><td class="num">${d}</td><td>${WD[wd(d)]}${dtype(d)&&holName(S.cur,d)?' ('+holName(S.cur,d)+')':dtype(d)==='hol'?' (חג)':dtype(d)==='eve'?' (ערב חג)':''}</td>`;
@@ -882,7 +897,7 @@ function renderLuach(){
     {const sg=signersOn(d);h+=sg.length?`<td>${esc(sg.map(pname).join(', '))}</td>`:sigDay(d)?`<td class="miss">חסר</td>`:`<td></td>`}
     h+=`</tr>`;
   }
-  $('#main').innerHTML=h+`</tbody></table></div>`;
+  $('#main').innerHTML=h0+h+`</tbody></table></div>`;
 }
 
 function renderSettings(){
