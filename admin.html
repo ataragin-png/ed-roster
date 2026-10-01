@@ -462,7 +462,6 @@ function analyze(){
       if(r.group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
       if(cl.c.length&&cl.mk==='vac')add(pid,d,'err','שובץ ביום חופש');
       for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d,typeBy(code));if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
-      if(cl.c.length&&cl.mk==='soft')add(pid,d,'warn','שובץ ביום שביקש שלא');
       if(cl.mk==='want'&&cl.wc&&cl.c.length&&!cl.c.some(c=>typeBy(c)&&wcMatch(cl.wc,typeBy(c))))add(pid,d,'warn',`ביקש ${wcName(cl.wc)}`);
     }
     {const nd=new Set(list.filter(x=>isNight(typeBy(x.code))).map(x=>x.d));for(const d of nd)if(nd.has(d-1)&&nd.has(d-2))add(pid,d,'err','שלושה לילות ברצף')}
