@@ -749,7 +749,7 @@ function renderGrid(){
 
 function planLabelToGroup(l){l=norm(l);if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return{g:'A',rot:'אגף א'};if(/מילואים|שלב\s*[אב]|לא\s*פעיל|חל.?ד|חופשת\s*לידה|סטאז|^חופש$/.test(l))return{g:'X',rot:l};return{g:'R',rot:l}}
 function applyPlan(key){const mo=S.months[key];if(!mo||!S.rotPlan)return 0;let n=0;
-  for(const pid in S.rotPlan){const G=planLabelToGroup((S.rotPlan[pid]||{})[key]);if(!G||!person(pid))continue;let r=mo.roster[pid];
+  for(const pid in S.rotPlan){const G=planLabelToGroup((S.rotPlan[pid]||{})[key]);if(!G||!person(pid)||(mo.removed&&mo.removed[pid]))continue;let r=mo.roster[pid];
     if(!r){mo.roster[pid]=blankRoster(G.g,G.rot,'',Object.keys(mo.roster).length+1);n++;continue}
     if(r.group!==G.g||r.rot!==G.rot){r.group=G.g;r.rot=G.rot;n++}}return n}
 function planMonths(){const n=new Date(),set=new Set(Object.keys(S.months));for(const pid in (S.rotPlan||{}))for(const k in S.rotPlan[pid])set.add(k);for(let i=0;i<4;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);set.add(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return[...set].sort().slice(-8)}
@@ -804,7 +804,8 @@ function importPlanText(txt){
 }
 function cleanName(x){return norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,' ').trim()}
 function personForSheet(sn){const c=cleanName(sn);if(!c)return null;
-  return S.people.find(p=>p.sheetName&&cleanName(p.sheetName)===c)||S.people.find(p=>!p.sheetName&&cleanName(p.name)===c)||null}
+  const hit=S.people.find(p=>p.sheetName&&cleanName(p.sheetName)===c)||S.people.find(p=>!p.sheetName&&cleanName(p.name)===c);if(hit)return hit;
+  const al=(S.nameAliases||{})[nameKey(sn)];return al?person(al)||null:null}
 function parseProgram(vals){let mc=null,year=null;const out=[];
   for(const row of vals){const cells=row.map(x=>norm(x));const m={};cells.forEach((c,i)=>{const mi=HEB_MONTHS.indexOf(c);if(mi>=0&&!(mi in m))m[mi]=i});
     if(Object.keys(m).length>=6){mc=m;continue}
@@ -857,7 +858,7 @@ function rulesPanel(){
   return h;
 }
 function renderPeople(){
-  const ids=rosterIds();
+  const ids=rosterIds();const rem=Object.keys(M().removed||{}).filter(person);
   let h=planPanel()+rulesPanel()+`<div class="panel"><h2>מתמחים החודש</h2><p class="hint">קבוצה קובעת את המכסה: אגף א מקבל ${S.settings.baseAS} משמרות ו־${S.settings.baseAD} תורנויות, סבב מקבל ${S.settings.baseRD} תורנויות. המכסה יורדת יחסית לימי החופש. ימי חופש שסומנו בלוח נספרים אוטומטית; אפשר להוסיף ימים כאן או לקבוע יעד ידני. בשורת ההעדפות: לחיצה אחת מסמנת "מעדיף", שנייה "לא רוצה", שלישית מנקה.</p>
   <div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>קבוצה</th><th>סבב</th><th title="משובץ לבוקר הזה בימי חול כשהוא לא אחרי תורנות">בוקר קבוע</th><th>חופש</th><th>יעד משמ׳</th><th>יעד תור׳</th><th>חותם שחרור</th>${S.types.filter(t=>t.restrict).map(t=>`<th>מאושר ל${esc(t.name)}</th>`).join('')}<th>העדפות</th><th>בקשות והערות</th><th></th></tr></thead><tbody>`;
   for(const pid of ids){
@@ -876,7 +877,7 @@ function renderPeople(){
       <td><textarea data-f="notes" rows="2">${esc(r.notes)}</textarea></td>
       <td><button class="btn small danger" data-del="${pid}" aria-label="הסר את ${esc(pname(pid))} מהחודש">הסר</button></td></tr>`;
   }
-  h+=`</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn" id="bAddP">הוסף מתמחה</button><button class="btn" id="bDup">איחוד שמות כפולים</button></div></div>`;
+  h+=`</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn" id="bAddP">הוסף מתמחה</button><button class="btn" id="bDup">איחוד שמות כפולים</button></div>${rem.length?`<p class="hint" style="margin-top:10px">הוסרו מ${kLabel(S.cur)} ולא יוחזרו אוטומטית: ${rem.map(p=>`${esc(pname(p))} <button class="btn small" data-unrem="${p}">החזר</button>`).join(' ')}</p>`:''}</div>`;
   $('#main').innerHTML=h;
 }
 
@@ -1600,10 +1601,11 @@ $('#main').addEventListener('click',e=>{
   if(b.dataset.cov){covSheet(b.dataset.cov,Number(b.dataset.d));return}
   if(b.dataset.person){tab='people';render();return}
   if(b.dataset.pref){const pid=b.closest('tr').dataset.pid,r=M().roster[pid];r.pref=r.pref||{};const v=r.pref[b.dataset.pref];if(v===1)r.pref[b.dataset.pref]=-1;else if(v===-1)delete r.pref[b.dataset.pref];else r.pref[b.dataset.pref]=1;save();renderPeople();return}
-  if(b.dataset.del){const pid=b.dataset.del;if(!confirm(`להסיר את ${pname(pid)} מהחודש הזה, כולל השיבוצים שלו?`))return;pushUndo();delete M().roster[pid];for(const k in M().cells)if(k.startsWith(pid+'|'))delete M().cells[k];save();renderPeople();return}
+  if(b.dataset.del){const pid=b.dataset.del;if(!confirm(`להסיר את ${pname(pid)} מהחודש הזה, כולל השיבוצים שלו? הוא לא יוחזר אוטומטית מתוכנית ההתמחות.`))return;pushUndo();M().removed=M().removed||{};M().removed[pid]=true;delete M().roster[pid];for(const k in M().cells)if(k.startsWith(pid+'|'))delete M().cells[k];save();renderPeople();return}
   if(b.id==='bProgSync'){syncProgram(true);return}
   if(b.dataset.addprog){const n=b.dataset.addprog;const p={id:uid(),name:n,sheetName:n};S.people.push(p);save();syncProgram(true);return}
   if(b.id==='planGo'){importPlanText($('#planPaste').value);return}
+  if(b.dataset.unrem){const pid=b.dataset.unrem;delete M().removed[pid];applyPlan(S.cur);if(!M().roster[pid])M().roster[pid]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();return}
   if(b.dataset.rudel){const p=person(b.dataset.rudel);if(p&&confirm(`להסיר את הכללים האישיים של ${p.name}?`)){delete p.rules;save();renderPeople()}return}
   if(b.id==='bDup'){dupSheet();return}
   if(b.id==='bAddP'){const id=uid();S.people.push({id,name:'מתמחה חדש'});M().roster[id]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();const inp=document.querySelector(`tr[data-pid="${id}"] input[data-f="name"]`);inp&&(inp.focus(),inp.select());return}
