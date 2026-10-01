@@ -393,6 +393,9 @@ function isMorn(t){return hm(t.start)<720}
 function isNight(t){return hm(t.end)<=hm(t.start)}
 function availFrac(pid){return Math.max(0.15,1-vacDays(pid)/dim())}
 function isSigner(pid){const p=person(pid);return!!(p&&p.signer)&&M().roster[pid]&&M().roster[pid].group!=='X'}
+function sigWhy(d){const out=[];for(const p of rosterIds()){if(!person(p).signer)continue;const r=M().roster[p];const cs=cellOf(p,d).c.map(typeBy).filter(Boolean);
+  if(r.group==='X'&&cs.length)out.push(`${pname(p)} רשום כלא זמין החודש`);else{const night=cs.filter(t=>isNight(t)&&!t.signer);if(night.length)out.push(`${pname(p)} ב${night[0].name}, שלא נחשבת לכיסוי חותם`)}}
+  return out.length?'. '+out.join('; '):''}
 function sigDay(d){return S.types.some(t=>t.signer&&need(t.code,d))}
 function signersOn(d){return rosterIds().filter(p=>isSigner(p)&&cellOf(p,d).c.some(c=>typeBy(c)?.signer))}
 function didRot(pid,re){const rp=(S.rotPlan||{})[pid]||{};const rx=new RegExp(re);for(const k in rp)if(k<=S.cur&&rx.test(rp[k]))return true;return false}
@@ -462,7 +465,6 @@ function analyze(){
       if(r.group==='R'){const sh=cl.c.filter(c=>typeBy(c)?.kind==='shift').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
       if(cl.c.length&&cl.mk==='vac')add(pid,d,'err','שובץ ביום חופש');
       for(const code of cl.c){if(!typeBy(code))continue;const bh=blockHit(pid,iv(code,d),d,typeBy(code));if(bh)add(pid,d,'err',`שובץ בזמן שהמתמחה חסם (${bh})`)}
-      if(cl.mk==='want'&&cl.wc&&cl.c.length&&!cl.c.some(c=>typeBy(c)&&wcMatch(cl.wc,typeBy(c))))add(pid,d,'warn',`ביקש ${wcName(cl.wc)}`);
     }
     {const nd=new Set(list.filter(x=>isNight(typeBy(x.code))).map(x=>x.d));for(const d of nd)if(nd.has(d-1)&&nd.has(d-2))add(pid,d,'err','שלושה לילות ברצף')}
     {const cc={};for(const x of list){const t=typeBy(x.code);cc[x.code]=(cc[x.code]||0)+1;if(t.noWeekend&&isWeekend(x.d))add(pid,x.d,'warn',`${t.name} לא משובץ בסופ״ש`);if(t.maxPer&&Number(t.maxPer)>0&&cc[x.code]>Number(t.maxPer))add(pid,x.d,'warn',`יותר מ־${t.maxPer} ${t.name} בחודש`)}}
@@ -614,27 +616,23 @@ function autofill(){
         if(pass===0&&intTypes.some(t=>has.has(t.code+'|'+d)))continue;
         let bp=null,bt=null,bs=-1e9;
         for(const t of intTypes){if(has.has(t.code+'|'+d))continue;const needSig=t.signer&&!covered.has(d);
-          for(const pid of ids){const e=evaluate(pid,t,d,ctx);if(e.hard)continue;let sc=e.score+Math.random()*2.2;if(needSig&&sigs.has(pid))sc+=12;if(sc>bs){bs=sc;bp=pid;bt=t}}}
+          for(const pid of ids){const e=evaluate(pid,t,d,ctx);if(e.hard)continue;let sc=e.score+Math.random()*2.2;if(needSig&&sigs.has(pid))sc+=12;if(ctx.tgt[pid].D-ctx.cnt[pid].duty<=1&&!extraTypes.some(x=>ctx.cc[pid][x.code]))sc-=6;if(sc>bs){bs=sc;bp=pid;bt=t}}}
         if(bp){put(bp,bt,d);intN++}}
     }
+    // שלב 3: תורנות חוץ אחת לכל מתמחה (טיפול נמרץ, אורתופדיה, ילדים), במידת האפשר
+    const extCnt=pid=>extraTypes.reduce((a,t)=>a+(ctx.cc[pid][t.code]||0),0);
+    const dutyRound=(types,cap,nDays)=>{for(let round=0;round<12;round++){let any=false;
+      for(const pid of [...ids].sort(()=>Math.random()-.5)){
+        if(M().roster[pid].group==='X'||ctx.cnt[pid].duty>=ctx.tgt[pid].D)continue;if(cap&&extCnt(pid)>=cap)continue;
+        let bt=null,bd=0,bs=-1e9;const days=[...Array(N)].map((_,i)=>i+1).sort(()=>Math.random()-.5).slice(0,nDays);
+        for(const d of days)for(const t of types){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random();if(sc>bs){bs=sc;bt=t;bd=d}}
+        if(bt){put(pid,bt,bd);any=true}}
+      if(!any)break}};
+    dutyRound(extraTypes,1,N);
     // שלב 3ב: תורנויות שנשארו הולכות לפנימית (צד ג או מהלכים פנימית)
-    for(let round=0;round<12;round++){let any=false;
-      for(const pid of [...ids].sort(()=>Math.random()-.5)){
-        if(M().roster[pid].group==='X'||ctx.cnt[pid].duty>=ctx.tgt[pid].D)continue;
-        let bt=null,bd=0,bs=-1e9;const days=[...Array(N)].map((_,i)=>i+1).sort(()=>Math.random()-.5).slice(0,16);
-        for(const d of days)for(const t of intTypes){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random();if(sc>bs){bs=sc;bt=t;bd=d}}
-        if(bt){put(pid,bt,bd);any=true}}
-      if(!any)break}
-    // שלב 4 מוגדר אחרי שלב 3
-    // שלב 3: השלמת מכסת התורנויות של כל מתמחה בטיפול נמרץ, אורתופדיה וילדים
-    for(let round=0;round<12;round++){let any=false;
-      for(const pid of [...ids].sort(()=>Math.random()-.5)){
-        if(M().roster[pid].group==='X'||ctx.cnt[pid].duty>=ctx.tgt[pid].D)continue;
-        let bt=null,bd=0,bs=-1e9;
-        const days=[...Array(N)].map((_,i)=>i+1).sort(()=>Math.random()-.5).slice(0,14);
-        for(const d of days)for(const t of extraTypes){if(has.has(t.code+'|'+d))continue;const e=evaluate(pid,t,d,ctx);if(e.hard)continue;const sc=e.score+Math.random();if(sc>bs){bs=sc;bt=t;bd=d}}
-        if(bt){put(pid,bt,bd);any=true}}
-      if(!any)break}
+    dutyRound(intTypes,0,16);
+    // שלב 3ג: אם עדיין חסרות תורנויות במכסה, תורנות חוץ נוספת
+    dutyRound(extraTypes,0,14);
     // שלב 4: השלמת משמרות לאגף א: קודם בוקר מהלכים כירורגיה, אחר כך בוקר אורתופדיה או מד״א
     const fillT=S.types.filter(t=>t.filler);
     if(fillT.length)for(const pid of ids.filter(p=>M().roster[p].group==='A').sort(()=>Math.random()-.5)){
@@ -694,7 +692,7 @@ function renderGrid(){
   const A=analyze(), N=dim(), ids=rosterIds();
   let h=`<div class="status">`+(M().final?`<span class="pill good">הלוח אושר סופית ב־${new Date(M().final).toLocaleDateString('he-IL')}</span><button class="btn small" id="inReopen">פתח לעריכה</button>`:`<span class="pill">הלוח בבנייה</span><button class="btn small primary" id="inFinalize">אשר את הלוח סופית</button>`);
   h+=A.missing?`<span class="pill bad">${A.missing} משבצות חובה חסרות</span>`:`<span class="pill good">כל משבצות החובה מאוישות</span>`;
-  {const ic=internalCount(),im=S.settings.intMin||0;if(im)h+=`<span class="pill ${ic<im?'bad':'good'}" title="תורנויות צד ג ומהלכים פנימית בחודש">פנימית ${ic} מתוך ${im}</span>`}
+  {const ic=internalCount(),im=S.settings.intMin||0;let iw=0;for(let d=1;d<=dim();d++)if(isWeekend(d))for(const t of S.types)if(t.internal)iw+=filled(t.code,d).length;if(im)h+=`<span class="pill ${ic<im?'bad':'good'}" title="תורנויות צד ג ומהלכים פנימית בחודש">פנימית ${ic} (מינימום ${im}), מתוכן ${iw} בסופ״ש</span>`}
   if(A.errs)h+=`<span class="pill bad">${A.errs} שגיאות</span>`;
   if(A.warns)h+=`<span class="pill mid">${A.warns} אזהרות</span>`;
   if(S.types.some(t=>t.signer))h+=A.noSig.length?`<span class="pill bad" title="${A.noSig.join(', ')}">${A.noSig.length} לילות בלי חותם שחרור</span>`:`<span class="pill good">יש חותם שחרור בכל לילה</span>`;
@@ -742,7 +740,7 @@ function renderGrid(){
   if(S.types.some(t=>t.signer)){
     h+=`<tr class="cov"><td class="namecol" colspan="6"><span class="sig">ח</span> חותם שחרור בלילה</td>`;
     for(let d=1;d<=N;d++){const sg=signersOn(d),need_=sigDay(d);const cls='covbtn'+(sg.length?'':need_?' miss':' none');
-      h+=`<td class="${dayClass(d)}"><span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center" title="${esc(fmtDate(d)+': '+(sg.length?sg.map(pname).join(', '):need_?'אין חותם שחרור בלילה':'לא נדרש'))}">${esc(sg.length?sg.map(pname).join('+'):need_?'חסר':'·')}</span></td>`}
+      h+=`<td class="${dayClass(d)}"><span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center" title="${esc(fmtDate(d)+': '+(sg.length?sg.map(pname).join(', '):need_?'אין חותם שחרור בלילה'+sigWhy(d):'לא נדרש'))}">${esc(sg.length?sg.map(pname).join('+'):need_?'חסר':'·')}</span></td>`}
     h+=`</tr>`;
   }
   h+=`</tbody></table></div>`;
