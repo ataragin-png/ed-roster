@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 45</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">1.10.2026 גרסה 46</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -336,7 +336,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='1.10.2026 גרסה 45';
+const BUILD='1.10.2026 גרסה 46';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -357,7 +357,8 @@ async function pushState(){
   try{ensurePlanNames();const st={...S,settings:{...S.settings,apiKey:''}};
     const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'saveState',key:S.settings.apiKey,ts:S.savedAt,state:JSON.stringify(st),tab:monthTab(S.cur)})});const j=await r.json();
     if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם':j.error==='action'?'צריך לעדכן את הקוד בגיליון':String(j.error));
-    setSync('נשמר בגיליון '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}))}
+    setSync('נשמר בגיליון '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}));
+    if(S.boardSync&&S.boardSync[S.cur])exportBoard(true,true)}
   catch(e){setSync('השמירה בגיליון נכשלה: '+e.message)}
 }
 async function loadFromServer(){
@@ -917,7 +918,7 @@ function statsPanel(){
 function renderLuach(){
   const N=dim(); const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
   let h0=statsPanel();
-  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}${apiOn()&&S.settings.boardUrl?`<button class="btn small" id="bBoard">ייצא ללוח התורנויות (Google Sheets)</button>${M().exportedAt?`<span style="color:var(--muted);font-size:13px">יוצא ${new Date(M().exportedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:''}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
+  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}${apiOn()&&S.settings.boardUrl?`<button class="btn small" id="bBoard">ייצא ללוח התורנויות (Google Sheets)</button><button class="btn small" id="bBoardIn">משוך שינויים מלוח התורנויות</button>${M().exportedAt?`<span style="color:var(--muted);font-size:13px">יוצא ${new Date(M().exportedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:''}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
   for(let d=1;d<=N;d++){
     h+=`<tr class="${dayClass(d)}"><td class="num">${d}</td><td>${WD[wd(d)]}${dtype(d)&&holName(S.cur,d)?' ('+holName(S.cur,d)+')':dtype(d)==='hol'?' (חג)':dtype(d)==='eve'?' (ערב חג)':''}</td>`;
     for(const t of cols){const f=filled(t.code,d), n=need(t.code,d);h+=f.length?`<td>${esc(f.map(pname).join(', '))}</td>`:n?`<td class="miss">חסר</td>`:`<td></td>`}
@@ -1450,15 +1451,50 @@ function boardRows(){const N=dim(),cols=boardCols();const rows=[['','יום',...
     rows.push(row);if(isWeekend(d))wk.push(d)}
   return{rows,wk}}
 function boardTabName(){const[y,m]=ym();return`${ENG_M[m-1]} ${String(y).slice(2)}`}
-async function exportBoard(overwrite){
-  const st=S.settings;if(!apiOn()){toast('צריך שרת ומפתח');return}
-  const id=((st.boardUrl||'').match(/\/d\/([^/]+)/)||[])[1];if(!id){toast('אין קישור ללוח התורנויות בלשונית משמרות וכללים',4000);return}
-  const{rows,wk}=boardRows();const name=boardTabName();
+function boardSig(rows){const t=rows.map(r=>(r||[]).map(x=>norm(String(x??''))).join('\t').replace(/\t+$/,'')).join('\n').replace(/\n+$/,'');let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return String(h)}
+function boardId(){return((S.settings.boardUrl||'').match(/\/d\/([^/]+)/)||[])[1]}
+let boardBusy=false;
+async function exportBoard(overwrite,silent){
+  const st=S.settings;if(!apiOn()){if(!silent)toast('צריך שרת ומפתח');return}
+  const id=boardId();if(!id){if(!silent)toast('אין קישור ללוח התורנויות בלשונית משמרות וכללים',4000);return}
+  const{rows,wk}=boardRows();const name=boardTabName(),sig=boardSig(rows);S.boardSync=S.boardSync||{};
+  if(silent&&S.boardSync[S.cur]&&S.boardSync[S.cur].hash===sig)return;
+  if(boardBusy)return;boardBusy=true;
   try{const r=await fetch(st.apiUrl,{method:'POST',body:JSON.stringify({action:'exportBoard',key:st.apiKey,id,name,rows,weekend:wk,overwrite:!!overwrite})});const j=await r.json();
-    if(!j.ok){if(j.error==='exists'){if(confirm(`בלוח התורנויות כבר יש לשונית בשם "${name}". להחליף אותה בלוח הנוכחי?`))return exportBoard(true);return}
-      throw new Error(j.error==='action'?'צריך לעדכן את הקוד בגיליון לגרסה 6':j.error==='key'?'המפתח לא תואם':String(j.error))}
-    M().exportedAt=Date.now();save();render();toast(`הלוח יוצא ללשונית "${name}" בלוח התורנויות`,4500)}
-  catch(e){toast('הייצוא נכשל: '+e.message,6000)}
+    if(!j.ok){if(j.error==='exists'&&!silent){boardBusy=false;if(confirm(`בלוח התורנויות כבר יש לשונית בשם "${name}". להחליף אותה בלוח הנוכחי?`))return exportBoard(true);return}
+      throw new Error(j.error==='action'?'צריך לעדכן את הקוד בגיליון':j.error==='key'?'המפתח לא תואם':String(j.error))}
+    M().exportedAt=Date.now();S.boardSync[S.cur]={hash:sig,ts:Date.now()};try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+    if(!silent){render();toast(`הלוח יוצא ללשונית "${name}" בלוח התורנויות. מעכשיו הוא יתעדכן שם אוטומטית`,4500)}}
+  catch(e){if(!silent)toast('הייצוא נכשל: '+e.message,6000)}finally{boardBusy=false}
+}
+async function importBoard(manual){
+  const st=S.settings;if(!apiOn())return;const id=boardId();if(!id)return;S.boardSync=S.boardSync||{};
+  if(!manual&&!S.boardSync[S.cur])return;
+  const key=S.cur,name=boardTabName();
+  try{const r=await fetch(st.apiUrl+'?action=readBoard&key='+encodeURIComponent(st.apiKey)+'&id='+encodeURIComponent(id)+'&name='+encodeURIComponent(name));const j=await r.json();
+    if(!j.ok)throw new Error(j.error==='action'?'צריך לעדכן את הקוד בגיליון לגרסה 7':String(j.error));
+    if(S.cur!==key)return;
+    if(!j.values){if(manual)toast(`אין עדיין לשונית "${name}" בלוח התורנויות`,4000);return}
+    const vals=j.values;const hi=vals.findIndex(r=>r.some(c=>norm(c)==='יום'));if(hi<0){if(manual)toast('לא נמצאה שורת כותרת בלשונית');return}
+    const cols=boardCols();const head=vals[hi].map(norm);const ci=cols.map(c=>head.indexOf(c.h));
+    const width=2+cols.length;const trimmed=[vals[hi].slice(0,width),...vals.slice(hi+1).filter(r=>/^\d+$/.test(norm(r[0]))).map(r=>r.slice(0,width))];
+    const sig=boardSig(trimmed);if(!manual&&S.boardSync[key]&&S.boardSync[key].hash===sig)return;
+    const N=dim(),unknown=new Set();let changes=0;pushUndo();
+    for(const row of vals.slice(hi+1)){const d=Number(norm(row[0]));if(!(d>=1&&d<=N))continue;
+      cols.forEach((col,k)=>{if(ci[k]<0)return;const raw=norm(row[ci[k]]);
+        const names=raw?raw.split(/\s*[\/+,]\s*/).map(x=>norm(x.replace(/\(.*?\)/g,''))).filter(Boolean):[];
+        const want=[];for(const n of names){const p=findPerson(n)||(typeof personForSheet==='function'?personForSheet(n):null);if(p&&M().roster[p.id])want.push(p.id);else unknown.add(n)}
+        if(names.length&&want.length<names.length)return;
+        const cur=new Set();for(const code of col.c)for(const p of filled(code,d))cur.add(p);
+        const same=cur.size===want.length&&want.every(p=>cur.has(p));if(same)return;
+        const pick=col.c.find(c=>need(c,d))||col.c.find(c=>filled(c,d).length)||col.c[0];
+        for(const p of cur){const cl=cellOf(p,d);setCell(p,d,{c:cl.c.filter(c=>!col.c.includes(c)),mk:cl.mk})}
+        for(const p of want){const cl=cellOf(p,d);if(!cl.c.includes(pick))setCell(p,d,{c:[...cl.c,pick],mk:cl.mk})}
+        changes++})}
+    S.boardSync[key]={hash:sig,ts:Date.now()};
+    if(changes){if(M().final)addLog(key,`עודכנו ${changes} תאים מתוך לוח התורנויות`);save();render()}else undoStack.pop();
+    if(changes||manual)toast(changes?`עודכנו ${changes} שינויים מלוח התורנויות${unknown.size?`. שמות שלא זוהו (לא שונו): ${[...unknown].join(', ')}`:''}`:'אין שינויים בלוח התורנויות',5000)}
+  catch(e){if(manual)toast('הקריאה מלוח התורנויות נכשלה: '+e.message,6000)}
 }
 async function publishCalendar(){
   if(!apiOn()){calSheet();return}
@@ -1611,7 +1647,7 @@ $('#main').addEventListener('change',e=>{
 /* ---------- events ---------- */
 function goTab(t){tab=t;S.lastTab=t;save();render();if(t==='inbox')pullRequests(true)}
 document.querySelector('nav.tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)goTab(b.dataset.tab)});
-$('#monthSel').addEventListener('change',e=>{S.cur=e.target.value;undoStack=[];$('#bUndo').disabled=true;save();render()});
+$('#monthSel').addEventListener('change',e=>{S.cur=e.target.value;undoStack=[];$('#bUndo').disabled=true;save();render();importBoard(false)});
 $('#bAuto').onclick=()=>{const b=$('#bAuto');b.disabled=true;b.textContent='מחשב שיבוץ…';setTimeout(()=>{try{autofill()}finally{b.disabled=false;b.textContent='מלא משבצות חסרות'}},30)};
 $('#bUndo').onclick=undo;
 $('#bNew').onclick=newMonthSheet;
@@ -1660,6 +1696,7 @@ $('#main').addEventListener('click',e=>{
   if(b.id==='bCal'){calSheet();return}
   if(b.id==='bPub'){publishCalendar();return}
   if(b.id==='bBoard'){exportBoard(false);return}
+  if(b.id==='bBoardIn'){importBoard(true);return}
   if(b.dataset.tdel!==undefined){const t=S.types[+b.dataset.tdel];if(!confirm(`למחוק את "${t.name}"? שיבוצים קיימים בקוד ${t.code} יסומנו כקוד לא מוכר.`))return;S.types.splice(+b.dataset.tdel,1);save();renderSettings();return}
   if(b.id==='bAddT'){S.types.push(T('x'+(S.types.length+1),'משמרת חדשה','חדש','duty','16:00','08:00',['A','R'],[0,0,0,0,0,0,0],'slate'));save();renderSettings();return}
   if(b.id==='bResetT'){if(!confirm('להחזיר את רשימת המשמרות לברירת המחדל?'))return;S.types=defaultTypes();save();renderSettings();return}
@@ -1716,7 +1753,8 @@ $('#main').addEventListener('change',e=>{
 });
 render();
 autoDedupe();
-loadFromServer().then(()=>{autoDedupe();syncProgram(false);if(tab==='inbox')pullRequests(true)});
+loadFromServer().then(()=>{autoDedupe();syncProgram(false);importBoard(false);if(tab==='inbox')pullRequests(true)});
+let lastVis=Date.now();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastVis>60000){lastVis=Date.now();importBoard(false)}});
 </script>
 </body>
 </html>
