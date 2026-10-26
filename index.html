@@ -277,7 +277,7 @@ RQ.b=new Map((RQ.b||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.bpart)RQ.bpart
 let VIEW='req';try{VIEW=localStorage.getItem('ed-request-view')||'req'}catch(e){}
 const CH={m:monthOpts()[0],kind:'swap',d1:'',c1:'',w:'',d2:'',c2:'',agree:false,t:''};
 function setView(v){VIEW=v;try{localStorage.setItem('ed-request-view',v)}catch(e){}render()}
-function viewTabs(){return`<nav class="tabs" role="tablist" style="padding:0;margin-bottom:12px"><button role="tab" data-view="req" aria-selected="${VIEW==='req'}">בקשות לחודש הבא</button><button role="tab" data-view="chg" aria-selected="${VIEW==='chg'}">בקשת החלפה</button><button role="tab" data-view="cal" aria-selected="${VIEW==='cal'}">הלוח שלי</button></nav>`}
+function viewTabs(){return`<nav class="tabs" role="tablist" style="padding:0;margin-bottom:12px"><button role="tab" data-view="req" aria-selected="${VIEW==='req'}">בקשות לחודש הבא</button><button role="tab" data-view="swp" aria-selected="${VIEW==='swp'}">עם מי להחליף</button><button role="tab" data-view="chg" aria-selected="${VIEW==='chg'}">בקשת החלפה</button><button role="tab" data-view="cal" aria-selected="${VIEW==='cal'}">הלוח שלי</button></nav>`}
 function dateSel(id,val,key){return`<select id="${id}"><option value="">תאריך</option>${[...Array(kDim(key))].map((_,i)=>i+1).map(d=>`<option value="${d}" ${String(val)===String(d)?'selected':''}>${d} (${WD[kWd(key,d)]})</option>`).join('')}</select>`}
 function shiftSel(id,val){return`<select id="${id}"><option value="">משמרת</option>${ALLT.map(([c,n])=>`<option value="${c}" ${val===c?'selected':''}>${esc(n)}</option>`).join('')}</select>`}
 let CAL=null;try{CAL=JSON.parse(localStorage.getItem('ed-cal-v1')||'null')}catch(e){}
@@ -301,7 +301,7 @@ async function saveIcs(list){const txt=icsText(list),fname=`משמרות_${kLabe
   if(dl){try{await dl.save({filename:fname,data:new Blob([txt],{type:'text/calendar'})});toast('הקובץ נשמר')}catch(e){if(!(e&&e.code==='declined'))toast('השמירה לא הושלמה')}return}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));a.download=fname;document.body.appendChild(a);a.click();a.remove()}catch(e){toast('ההורדה לא זמינה בדפדפן הזה. השתמשו בכפתורי Google')}}
 let calFetched=false;
-async function fetchCal(manual){if(!API)return;try{const r=await fetch(API+'?action=calendar');const j=await r.json();if(j.ok&&j.cal){CAL=b64d(j.cal);localStorage.setItem('ed-cal-v1',JSON.stringify(CAL));if(VIEW==='cal')render();if(manual)toast('הלוח עודכן')}else if(manual)toast('עוד לא פורסם לוח')}catch(e){if(manual)toast('הטעינה נכשלה')}}
+async function fetchCal(manual){if(!API)return;try{const r=await fetch(API+'?action=calendar');const j=await r.json();if(j.ok&&j.cal){CAL=b64d(j.cal);localStorage.setItem('ed-cal-v1',JSON.stringify(CAL));if(VIEW==='cal'||VIEW==='swp')render();if(manual)toast('הלוח עודכן')}else if(manual)toast('עוד לא פורסם לוח')}catch(e){if(manual)toast('הטעינה נכשלה')}}
 function renderCal(){
   if(API&&!calFetched){calFetched=true;fetchCal(false)}
   const names=CAL?Object.keys(CAL.a).sort((a,b)=>a.localeCompare(b,'he')):[];
@@ -321,13 +321,38 @@ function renderCal(){
   }
   $('#main').innerHTML=h+`</div>`;
 }
+let SWSEL='';
+function swData(){if(!CAL||!CAL.sw)return null;const me=norm(RQ.name);if(!me)return[];const k=Object.keys(CAL.sw).find(n=>norm(n)===me);if(!k||!CAL.sw[k])return[];
+  return CAL.sw[k].split(';').map(e=>{const i=e.indexOf(':'),h=e.slice(0,i),os=e.slice(i+1);const[d,c]=h.split('.');
+    return{d:+d,c,opts:(os?os.split(','):[]).map(o=>{const[q,d2,c2]=o.split('.');return{w:CAL.nl[parseInt(q,36)]||'?',d2:+d2,c2}})}}).sort((a,b)=>a.d-b.d)}
+function cname(c){return c==='mc+nc'?'24 שעות כירורגיה (בוקר+ערב)':(CAL&&CAL.t&&CAL.t[c]?CAL.t[c][0]:TNAME[c]||c)}
+function dlabel(d){return`${d}.${CAL.m.split('-')[1]*1} (${WD[kWd(CAL.m,d)]})`}
+function renderSwp(){
+  if(API&&!calFetched){calFetched=true;fetchCal(false)}
+  let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>עם מי אפשר להתחלף</strong><ul><li>בוחרים משמרת שלך, ורואים את כל המתמחים שאפשר להתחלף איתם לפי כללי השיבוץ: חסימות, מנוחה, לילות ברצף, תורנות צמודה ללילה, סופ״ש, הסמכות ועוד.</li><li>הרשימה מחושבת בזמן פרסום הלוח. החלפות שאושרו אחרי הפרסום ייכנסו בפרסום הבא.</li><li>קודם מסכמים עם המתמחה השני. לחיצה על "מלא בקשה" ממלאת את טופס ההחלפה, ושולחים משם.</li></ul></div>
+  <div class="fields"><label>השם שלי${nameSel('swN',RQ.name,'בחרו את השם שלכם')}</label></div>`;
+  if(API)h+=`<div class="row" style="margin:0 0 12px"><button class="btn" id="calFetch">טען את הלוח העדכני</button>${CAL?`<span style="color:var(--muted);font-size:13px">${kLabel(CAL.m)}, פורסם ${new Date(CAL.swTs||CAL.ts).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}</div>`;
+  if(!CAL)h+=`<p class="hint">עוד לא פורסם לוח.</p>`;
+  else if(!CAL.sw)h+=`<p class="hint">הלוח הנוכחי פורסם בלי רשימת החלפות. היא תופיע אחרי הפרסום הבא של רכז/ת השיבוץ.</p>`;
+  else if(!norm(RQ.name))h+=`<p class="hint">בחרו את השם שלכם כדי לראות את המשמרות.</p>`;
+  else{const L=swData();
+    if(!L.length)h+=`<p class="hint">לא נמצאו משמרות בשם הזה ב${kLabel(CAL.m)}.</p>`;
+    else{const key=d=>d.d+'|'+d.c;if(!L.some(x=>key(x)===SWSEL))SWSEL='';
+      h+=`<p style="font-size:14px;font-weight:600;margin:4px 0 8px">המשמרות שלי ב${kLabel(CAL.m)}</p><div class="cands" style="margin-bottom:14px">${L.map(x=>`<div class="cand" style="${key(x)===SWSEL?'background:var(--surface2)':''}"><span class="who num">${dlabel(x.d)}</span><span class="why" style="color:var(--ink)">${esc(cname(x.c))}</span><span style="color:var(--muted);font-size:12.5px">${x.opts.length?`${new Set(x.opts.map(o=>o.w)).size} מתמחים`:'אין החלפה'}</span><button class="btn small ${key(x)===SWSEL?'primary':''}" data-swslot="${key(x)}" ${x.opts.length?'':'disabled'}>הצג</button></div>`).join('')}</div>`;
+      const cur=L.find(x=>key(x)===SWSEL);
+      if(cur){const by={};cur.opts.forEach((o,i)=>{(by[o.w]=by[o.w]||[]).push([o,i])});
+        h+=`<p style="font-size:14px;font-weight:600;margin:4px 0 8px">אפשר להתחלף על ${esc(cname(cur.c))} ב־${dlabel(cur.d)} עם:</p>`;
+        for(const w of Object.keys(by).sort((a,b)=>a.localeCompare(b,'he')))h+=`<div style="font-weight:700;margin:10px 0 4px">${esc(w)}</div><div class="cands">${by[w].map(([o,i])=>`<div class="cand"><span class="why" style="color:var(--ink)">${esc(w)} לוקח/ת את המשמרת שלך, ואת/ה לוקח/ת ממנו/ה <b>${esc(cname(o.c2))}</b> ב־<b>${dlabel(o.d2)}</b></span><button class="btn small primary" data-swpick="${i}">מלא בקשה</button></div>`).join('')}</div>`}
+    }}
+  $('#main').innerHTML=h+`</div>`;
+}
 function renderChg(){
   const key=CH.m;
   let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>החלפות אחרי פרסום הלוח</strong><ul><li>אפשר להתחלף עם מתמחה אחר, או למסור לו משמרת.</li><li>קודם מסכמים עם המתמחה השני, ואז שולחים את הבקשה.</li><li>השינוי נכנס ללוח רק אחרי אישור רכז/ת השיבוץ.</li></ul></div>
   <div class="fields">
     <label>השם שלי${nameSel('chN',RQ.name,'בחרו את השם שלכם')}</label>
     <datalist id="rqNames">${NAMES.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
-    <label>חודש<select id="chM">${monthOpts().slice(0,2).map(k=>`<option value="${k}" ${k===key?'selected':''}>${kLabel(k)}</option>`).join('')}</select></label>
+    <label>חודש<select id="chM">${[...new Set([...monthOpts().slice(0,2),key])].map(k=>`<option value="${k}" ${k===key?'selected':''}>${kLabel(k)}</option>`).join('')}</select></label>
     <label>סוג הבקשה<span class="seg"><button data-chk="swap" aria-pressed="${CH.kind==='swap'}">החלפה</button><button data-chk="give" aria-pressed="${CH.kind==='give'}">מסירת משמרת</button></span></label>
   </div>
   <div class="fields"><label>המשמרת שלי${dateSel('chD1',CH.d1,key)}</label><label>&nbsp;${shiftSel('chC1',CH.c1)}</label></div>
@@ -358,6 +383,7 @@ function render(){
   if(RQ.name&&!nameList().includes(RQ.name)){const c=x=>norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,'');const m=nameList().find(n=>c(n)===c(RQ.name));RQ.name=m||'';persist()}
   if(VIEW==='chg')return renderChg();
   if(VIEW==='cal')return renderCal();
+  if(VIEW==='swp')return renderSwp();
   const key=RQ.m,N=kDim(key),chk=checkBlocks(key,RQ.g,units()),H=hol(key);
   let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>כללי הגשת בקשות</strong><ul>
   <li>אגף א (פיילוט): אפשר לחסום עד ${RULES.A} משמרות, מתוכן עד ${RULES.wkA} בסופ״ש או בחג. חוסמים יום (09–21), לילה (21–09) או תורנות (16–08). חסימת יום שלם נספרת כשתי משמרות.</li>
@@ -420,6 +446,12 @@ document.addEventListener('click',e=>{
   if(b.id==='calIcs'){saveIcs(myShifts());return}
   if(b.id==='calFetch'){fetchCal(true);return}
   if(b.dataset.chk){CH.kind=b.dataset.chk;render();return}
+  if(b.dataset.swslot!==undefined){SWSEL=SWSEL===b.dataset.swslot?'':b.dataset.swslot;render();return}
+  if(b.dataset.swpick!==undefined){const L=swData()||[];const cur=L.find(x=>x.d+'|'+x.c===SWSEL);const o=cur&&cur.opts[+b.dataset.swpick];if(!o)return;
+    const c=x=>norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,'');const wn=nameList().find(n=>c(n)===c(o.w))||o.w;
+    const is24=cur.c==='mc+nc'||o.c2==='mc+nc';
+    Object.assign(CH,{m:CAL.m,kind:'swap',d1:String(cur.d),c1:cur.c.split('+')[0],w:wn,d2:String(o.d2),c2:o.c2.split('+')[0],agree:false,t:is24?'24 שעות כירורגיה: בוקר וערב עוברים יחד':''});
+    setView('chg');toast('הטופס מולא. סמנו שהמתמחה השני מסכים ושלחו',3500);return}
   if(b.id==='chSend'){
     const miss=[];if(!norm(RQ.name))miss.push('השם שלך');if(!CH.d1||!CH.c1)miss.push('המשמרת שלך');if(!norm(CH.w))miss.push('שם המתמחה השני');if(CH.kind==='swap'&&(!CH.d2||!CH.c2))miss.push('המשמרת של המתמחה השני');
     if(miss.length){toast('חסר: '+miss.join(', '),3500);return}
@@ -463,7 +495,7 @@ document.addEventListener('input',e=>{const id=e.target.id;if(id==='chT'){CH.t=e
 document.addEventListener('change',e=>{const id=e.target.id;
   if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();autoGroup();persist();render()}
   else if(id==='rqName'){RQ.name=e.target.value;if(planRow(RQ.name))autoGroup();persist();render()}
-  else if(id==='chN'){RQ.name=e.target.value;persist();render()}
+  else if(id==='chN'||id==='swN'){RQ.name=e.target.value;SWSEL='';persist();render()}
   else if(id==='chW'){CH.w=e.target.value}
   else if(id==='rqWcode'){RQ.wcode=e.target.value;persist()}
   else if(id==='rqVre'){RQ.vre=e.target.value;persist();render()}
