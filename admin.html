@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">26.10.2026 גרסה 59</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">27.10.2026 גרסה 60</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -338,7 +338,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='26.10.2026 גרסה 59';
+const BUILD='27.10.2026 גרסה 60';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -521,7 +521,7 @@ function analyze(){
     per[pid]={cnt,tgt:targets(pid),list,frac:availFrac(pid),w:balW(pid)};
   }
   let missing=0, missList=[];
-  for(let d=1;d<=N;d++)for(const t of S.types){const n=need(t.code,d);if(!n)continue;const f=filled(t.code,d).length;if(f<n){missing+=n-f;missList.push({d,code:t.code})}}
+  for(let d=1;d<=N;d++)for(const t of S.types){const n=need(t.code,d);if(!n)continue;const f=filled(t.code,d).length+(extOn(t.code,d)?1:0);if(f<n){missing+=n-f;missList.push({d,code:t.code})}}
   const byLoc={};
   for(const pid of ids)for(let d=1;d<=N;d++)for(const code of cellOf(pid,d).c){const t=typeBy(code);if(!t||!t.loc)continue;(byLoc[t.loc]=byLoc[t.loc]||[]).push({pid,d,code,...iv(code,d)})}
   const clash=[];
@@ -635,7 +635,7 @@ function can24(pid,d,ctx,mcT,ncT,ignorePid){
 function autofill(){
   const N=dim(), ids=rosterIds(), sigs=new Set(ids.filter(isSigner));
   const slots=[];
-  for(let d=1;d<=N;d++)for(const t of S.types){const n=need(t.code,d);const f=filled(t.code,d).length;for(let k=f;k<n;k++)slots.push({d,t})}
+  for(let d=1;d<=N;d++)for(const t of S.types){const n=need(t.code,d);const f=filled(t.code,d).length+(extOn(t.code,d)?1:0);for(let k=f;k<n;k++)slots.push({d,t})}
   const intTypes=S.types.filter(t=>t.internal), extraTypes=S.types.filter(t=>t.extra);
   const intMin=S.settings.intMin||0, intHave=internalCount();
   const kindRank={duty:0,shift:1,day:2,other:3};
@@ -1579,9 +1579,11 @@ function boardRows(){const N=dim(),cols=boardCols();const rows=[['','יום',...
       const all=[...new Set(ppl.flatMap(x=>x.ps))];
       if(all.length===1||ppl.length<=1)parts.push(all.map(pname).join(' / '));
       else parts.push(ppl.map(x=>`${x.ps.map(pname).join('+')} (${typeBy(x.code)?.short||x.code})`).join(' / '));
+      const ex=(M().ext||{})[col.h+'|'+d];if(ex)parts.push((parts.join('')?' / ':'')+ex);
       row.push(parts.join(''))}
     rows.push(row);if(isWeekend(d))wk.push(d)}
   return{rows,wk}}
+function extOn(code,d){const E=M().ext;if(!E)return false;return boardCols().some(c=>c.c.includes(code)&&E[c.h+'|'+d])}
 function boardTabName(){const[y,m]=ym();return`${ENG_M[m-1]} ${String(y).slice(2)}`}
 function boardSig(rows){const t=rows.map(r=>(r||[]).map(x=>norm(String(x??''))).join('\t').replace(/\t+$/,'')).join('\n').replace(/\n+$/,'');let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return String(h)}
 function boardId(){return((S.settings.boardUrl||'').match(/\/d\/([^/]+)/)||[])[1]}
@@ -1616,8 +1618,8 @@ async function importBoard(manual){
     for(const row of vals.slice(hi+1)){const d=Number(norm(row[0]));if(!(d>=1&&d<=N))continue;
       cols.forEach((col,k)=>{if(ci[k]<0)return;const raw=norm(row[ci[k]]);
         const names=raw?raw.split(/\s*[\/+,]\s*/).map(x=>norm(x.replace(/\(.*?\)/g,''))).filter(Boolean):[];
-        const want=[];for(const n of names){const p=findPerson(n)||(typeof personForSheet==='function'?personForSheet(n):null);if(p&&M().roster[p.id])want.push(p.id);else unknown.add(n)}
-        if(names.length&&want.length<names.length)return;
+        const want=[],ext=[];for(const n of names){const p=findPerson(n)||(typeof personForSheet==='function'?personForSheet(n):null);if(p&&M().roster[p.id])want.push(p.id);else{unknown.add(n);ext.push(n)}}
+        M().ext=M().ext||{};const ek=col.h+'|'+d;if(ext.length){if(M().ext[ek]!==ext.join(' / ')){M().ext[ek]=ext.join(' / ');changes++}}else if(M().ext[ek]){delete M().ext[ek];changes++}
         const cur=new Set();for(const code of col.c)for(const p of filled(code,d))cur.add(p);
         const same=cur.size===want.length&&want.every(p=>cur.has(p));if(same)return;
         const pick=col.c.find(c=>need(c,d))||col.c.find(c=>filled(c,d).length)||col.c[0];
@@ -1627,7 +1629,7 @@ async function importBoard(manual){
     for(let d=1;d<=N;d++)if(isWeekend(d))for(const p of rosterIds()){const cl=cellOf(p,d);if(cl.c.includes('bv')&&cl.c.includes('b')){setCell(p,d,{c:cl.c.filter(x=>x!=='b'),mk:cl.mk})}}
     S.boardSync[key]={hash:sig,ts:Date.now()};
     if(changes){if(M().final)addLog(key,`עודכנו ${changes} תאים מתוך לוח התורנויות`);save();render()}else undoStack.pop();
-    if(changes||manual)toast(changes?`עודכנו ${changes} שינויים מלוח התורנויות${unknown.size?`. שמות שלא זוהו (לא שונו): ${[...unknown].join(', ')}`:''}`:'אין שינויים בלוח התורנויות',5000)}
+    if(changes||manual)toast(changes?`עודכנו ${changes} שינויים מלוח התורנויות${unknown.size?`. שמות שאינם ברשימת המתמחים (נשמרו כמו שהם בגיליון): ${[...unknown].join(', ')}`:''}`:'אין שינויים בלוח התורנויות',5000)}
   catch(e){if(manual)toast('הקריאה מלוח התורנויות נכשלה: '+e.message,6000)}
 }
 /* בדיקה לפני פרסום או ייצוא: חפיפות, מנוחה, לילות ברצף וכל שגיאה אחרת */
