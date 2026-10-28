@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">27.10.2026 גרסה 60</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">28.10.2026 גרסה 61</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,9 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v17){S.v17=1;try{S.nameAliases=S.nameAliases||{};const dv=S.people.find(p=>norm(p.name)==='דוד');if(dv&&!S.nameAliases[nameKey('טרגין')])S.nameAliases[nameKey('טרגין')]=dv.id;
+  const mm=S.people.find(p=>norm(p.name)==='מוחמד מיסק');if(mm&&S.rotPlan&&S.rotPlan[mm.id])for(const k of Object.keys(S.rotPlan[mm.id]))if(k<'2026-01')delete S.rotPlan[mm.id][k];
+  if(dv&&S.rotPlan&&S.rotPlan[dv.id])for(const k of Object.keys(S.rotPlan[dv.id]))if(k<'2025-01'&&!(S.rotPlanManual||{})[dv.id+'|'+k])delete S.rotPlan[dv.id][k];}catch(e){}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v16){S.v16=1;for(const t of S.types)if(t.qualRot==='אורטופד')t.qualRot='אור[טת]ופד';try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v15){S.v15=1;const bs=S.people.find(p=>nameKey(p.name)===nameKey('בת שבע'));if(bs){bs.rules=bs.rules||{};bs.rules.noCodes=[...new Set([...(bs.rules.noCodes||[]),'i'])]}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v14){S.v14=1;if(S.settings.boardCols)S.settings.boardCols=S.settings.boardCols.replace(/^\s*כירורגיה\s*:\s*mc[\s,]+nc\s*$/m,'כירורגיה בוקר: mc\nכירורגיה ערב: nc');try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -338,7 +341,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='27.10.2026 גרסה 60';
+const BUILD='28.10.2026 גרסה 61';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -826,6 +829,11 @@ function renderGrid(){
 }
 
 function planLabelToGroup(l){l=norm(l);if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return{g:'A',rot:'אגף א'};if(/מילואים|שלב\s*[אב]|לא\s*פעיל|חל.?ד|חופשת\s*לידה|סטאז|^חופש$/.test(l))return{g:'X',rot:l};return{g:'R',rot:l}}
+function monthBuilt(key){const mo=S.months[key];return!!mo&&Object.values(mo.cells||{}).some(c=>c&&c.c&&c.c.length)}
+/* חודש שעוד לא שובץ: המתמחים בו הם בדיוק מי שמופיע בתוכנית ההתמחות לחודש הזה */
+function planIds(key){return Object.keys(S.rotPlan||{}).filter(pid=>person(pid)&&planLabelToGroup((S.rotPlan[pid]||{})[key]))}
+function prunePlan(key){const mo=S.months[key];if(!mo||monthBuilt(key))return 0;const ids=new Set(planIds(key));if(ids.size<8)return 0;let n=0;
+  for(const pid of Object.keys(mo.roster))if(!ids.has(pid)){delete mo.roster[pid];n++}return n}
 function applyPlan(key){const mo=S.months[key];if(!mo||!S.rotPlan)return 0;let n=0;
   for(const pid in S.rotPlan){const G=planLabelToGroup((S.rotPlan[pid]||{})[key]);if(!G||!person(pid)||(mo.removed&&mo.removed[pid]))continue;let r=mo.roster[pid];
     if(!r){mo.roster[pid]=blankRoster(G.g,G.rot,'',Object.keys(mo.roster).length+1);n++;continue}
@@ -884,7 +892,7 @@ function importPlanText(txt){
 function cleanName(x){return norm(x).replace(/["'׳״`\-־.]/g,'').replace(/\s+/g,' ').trim()}
 function personForSheet(sn){const c=cleanName(sn);if(!c)return null;
   const hit=S.people.find(p=>p.sheetName&&cleanName(p.sheetName)===c)||S.people.find(p=>!p.sheetName&&cleanName(p.name)===c)||S.people.find(p=>p.sheetName&&nameKey(p.sheetName)===nameKey(sn))||S.people.find(p=>!p.sheetName&&nameKey(p.name)===nameKey(sn));if(hit)return hit;
-  const al=(S.nameAliases||{})[nameKey(sn)];return al?person(al)||null:firstNameHit(sn)}
+  const al=(S.nameAliases||{})[nameKey(sn)];return al?person(al)||null:null}
 function parseProgram(vals){let mc=null,year=null;const out=[];
   for(const row of vals){const cells=row.map(x=>norm(x));const m={};cells.forEach((c,i)=>{const mi=HEB_MONTHS.indexOf(c);if(mi>=0&&!(mi in m))m[mi]=i});
     if(Object.keys(m).length>=6){mc=m;continue}
@@ -908,7 +916,7 @@ async function syncProgram(manual){
       for(const k in row.entries){if(S.rotPlanManual[p.id+'|'+k])continue;if(pl[k]!==row.entries[k]){pl[k]=row.entries[k];changed++}}
       seenPid.add(p.id);(sheetKeys[p.id]=sheetKeys[p.id]||new Set());for(const k in row.entries)sheetKeys[p.id].add(k)}
     for(const pid of seenPid){const pl=S.rotPlan[pid]||{};for(const k of Object.keys(pl)){if(!sheetKeys[pid].has(k)&&!S.rotPlanManual[pid+'|'+k]){delete pl[k];changed++}}}
-    let applied=0;for(const k in S.months)if(!S.months[k].final)applied+=applyPlan(k);
+    let applied=0;for(const k in S.months)if(!S.months[k].final&&!monthBuilt(k))applied+=applyPlan(k)+prunePlan(k);
     S.progSync={ts:Date.now(),unmatched};save();if(tab==='people')renderPeople();
     if(manual||changed)toast(`תוכנית ההתמחות סונכרנה${changed?`: ${changed} שינויים`:''}${applied?`, עודכנו ${applied} שיבוצי קבוצה`:''}`,4000)}
   catch(e){if(manual)toast('הסנכרון נכשל: '+e.message,5000)}finally{progSyncing=false}
@@ -1178,7 +1186,7 @@ function newMonthSheet(){
     const key=`${sh.el.querySelector('#nmY').value}-${String(sh.el.querySelector('#nmM').value).padStart(2,'0')}`;
     if(S.months[key]&&!confirm('החודש כבר קיים. לעבור אליו?'))return;
     if(!S.months[key]){const src=M().roster, roster={};for(const id in src){const r=src[id];roster[id]={...blankRoster(r.group,r.rot,'',r.order),pref:{...(r.pref||{})}}}
-      S.months[key]={roster,cells:{},dayTypes:autoTypes(key),autoHol:1,needOv:{}};applyPlan(key)}
+      S.months[key]={roster,cells:{},dayTypes:autoTypes(key),autoHol:1,needOv:{}};applyPlan(key);prunePlan(key)}
     S.cur=key;undoStack=[];$('#bUndo').disabled=true;save();sh.close();render();
   };
 }
@@ -1364,7 +1372,12 @@ function kLabel(key){const[y,m]=key.split('-').map(Number);return`${HEB_MONTHS[m
 function defaultReqMonth(){const n=new Date(),dt=new Date(n.getFullYear(),n.getMonth()+1,1);return`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`}
 function monthOpts(){const n=new Date(),set=new Set(Object.keys(S.months));for(let i=0;i<3;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);set.add(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return[...set].sort()}
 function norm(s){return String(s||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00ad]/g,'').trim().replace(/\s+/g,' ')}
-function findPerson(name){const n=norm(name);if(!n)return null;const ex=S.people.find(p=>norm(p.name)===n);if(ex)return ex;const k=typeof nameKey==='function'?nameKey(n):n;const al=(S.nameAliases||{})[k];if(al&&S.people.find(p=>p.id===al))return S.people.find(p=>p.id===al);const hit=typeof nameKey==='function'?S.people.find(p=>nameKey(p.name)===k):null;return hit||firstNameHit(n)}
+function findPerson(name){const n=norm(name);if(!n)return null;const ex=S.people.find(p=>norm(p.name)===n);if(ex)return ex;const k=typeof nameKey==='function'?nameKey(n):n;const al=(S.nameAliases||{})[k];if(al&&S.people.find(p=>p.id===al))return S.people.find(p=>p.id===al);const hit=typeof nameKey==='function'?S.people.find(p=>nameKey(p.name)===k):null;return hit||null}
+/* בקליטה מלוח התורנויות: מחפשים את השם בין המתמחים של החודש הזה (שם מלא, שם חלופי, או מילה אחת מהשם כשהיא ייחודית) */
+function boardPerson(n){const R=M().roster;let p=findPerson(n)||personForSheet(n);if(p&&R[p.id])return p;
+  const al=(S.nameAliases||{})[nameKey(n)];if(al&&R[al])return person(al);
+  const tk=x=>norm(x).replace(/["'׳״`]/g,'').split(/\s+/).filter(Boolean);const nt=tk(n);if(!nt.length)return p;
+  const L=Object.keys(R).map(person).filter(Boolean).filter(q=>{const qt=tk(q.name);return nt.every(t=>qt.includes(t))||qt.every(t=>nt.includes(t))});return L.length===1?L[0]:p}
 function firstNameHit(n){n=norm(n).replace(/["'׳״`]/g,'');if(!n||/\s/.test(n))return null;const L=S.people.filter(p=>{const r=S.months[S.cur]&&S.months[S.cur].roster[p.id];return r&&norm(p.name).replace(/["'׳״`]/g,'').split(/\s+/)[0]===n});return L.length===1?L[0]:null}
 function rulesFor(g){const r=S.settings.req;return g==='R'?{max:r.R,wk:r.wkR}:{max:r.A,wk:r.wkA}}
 function checkBlocks(key,g,blocks){
@@ -1618,7 +1631,7 @@ async function importBoard(manual){
     for(const row of vals.slice(hi+1)){const d=Number(norm(row[0]));if(!(d>=1&&d<=N))continue;
       cols.forEach((col,k)=>{if(ci[k]<0)return;const raw=norm(row[ci[k]]);
         const names=raw?raw.split(/\s*[\/+,]\s*/).map(x=>norm(x.replace(/\(.*?\)/g,''))).filter(Boolean):[];
-        const want=[],ext=[];for(const n of names){const p=findPerson(n)||(typeof personForSheet==='function'?personForSheet(n):null);if(p&&M().roster[p.id])want.push(p.id);else{unknown.add(n);ext.push(n)}}
+        const want=[],ext=[];for(const n of names){const p=boardPerson(n);if(p&&M().roster[p.id])want.push(p.id);else{unknown.add(n);ext.push(n)}}
         M().ext=M().ext||{};const ek=col.h+'|'+d;if(ext.length){if(M().ext[ek]!==ext.join(' / ')){M().ext[ek]=ext.join(' / ');changes++}}else if(M().ext[ek]){delete M().ext[ek];changes++}
         const cur=new Set();for(const code of col.c)for(const p of filled(code,d))cur.add(p);
         const same=cur.size===want.length&&want.every(p=>cur.has(p));if(same)return;
