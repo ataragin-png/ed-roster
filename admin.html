@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">28.10.2026 גרסה 61</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">29.10.2026 גרסה 62</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -341,7 +341,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='28.10.2026 גרסה 61';
+const BUILD='29.10.2026 גרסה 62';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -1597,6 +1597,28 @@ function boardRows(){const N=dim(),cols=boardCols();const rows=[['','יום',...
     rows.push(row);if(isWeekend(d))wk.push(d)}
   return{rows,wk}}
 function extOn(code,d){const E=M().ext;if(!E)return false;return boardCols().some(c=>c.c.includes(code)&&E[c.h+'|'+d])}
+/* הסידור הכללי של המלר״ד: מעדכנים רק את עמודות המתמחים, מנובמבר 2026 */
+const MAIN_ID='1KCavu2KRgD4DzspCwB391_PZmdQiXh3-Sj3H0HKnVHo',MAIN_FROM='2026-11';
+const MAIN_COLS={'בוקר 1-6':5,'לילה 1-6':7,'בוקר צד ב':9,'תורנות צד ב':11,'בוקר צד ג':13,'אגף ג':15,'פנימית':15,'כירורגיה בוקר':23,'כירורגיה ערב':24,'מהלכים פנימית':38,'פנימית תורן שני':38};
+const MAIN_SHORT={'מוחמד מיסק':'מיסק','סימא שולמאן':'סימא','באסל אבו עומר':'באסל','דב מרטן':'דב','אחמד עלי':'עלי'};
+let mainBusy=false;
+async function syncMainSheet(silent){
+  if(!apiOn()||S.cur<MAIN_FROM||mainBusy)return;mainBusy=true;const key=S.cur,st=S.settings;
+  try{const[y,m]=ym();const name=`${HEB_MONTHS[m-1]} ${y}`;
+    const r=await fetch(st.apiUrl+'?action=readTab&key='+encodeURIComponent(st.apiKey)+'&id='+MAIN_ID+'&name='+encodeURIComponent(name));const j=await r.json();
+    if(!j.ok)throw new Error(String(j.error||'שגיאה'));if(!j.values){if(!silent)toast(`בסידור הכללי אין עדיין לשונית "${name}"`,4000);return}
+    if(S.cur!==key)return;
+    const{rows}=boardRows();const head=rows[0].map(x=>norm(String(x)));const sh=t=>norm(t).split(/\s*\/\s*/).filter(Boolean).map(x=>MAIN_SHORT[x]||x).join(' / ');
+    const want={},ours=new Set();for(const p of rosterIds()){ours.add(norm(pname(p)));ours.add(MAIN_SHORT[norm(pname(p))]||norm(pname(p)))}
+    for(const row of rows.slice(1)){const d=Number(row[0]);const w={};head.forEach((h,i)=>{const c=MAIN_COLS[h],v=norm(String(row[i]||'').replace(/\s*\([^)]*\)/g,''));if(c&&v)w[c]=sh(v)});if(isWeekend(d)&&w[11]&&!w[9])w[9]=w[11];want[d]=w}
+    const cols=[...new Set(Object.values(MAIN_COLS))],cells=[];
+    j.values.forEach((rv,i)=>{const d=Number(norm(rv[0]));if(!(d>=1&&d<=dim())||!want[d])return;
+      for(const c of cols){const cur=norm(rv[c-1]||''),w=want[d][c]||'';if(cur===w)continue;
+        if(!w&&(!cur||!cur.split(/\s*\/\s*/).every(x=>ours.has(norm(x)))))continue;cells.push([i+1,c,w])}});
+    if(!cells.length){if(!silent)toast('הסידור הכללי כבר מעודכן');return}
+    const r2=await fetch(st.apiUrl,{method:'POST',body:JSON.stringify({action:'writeCells',key:st.apiKey,id:MAIN_ID,name,cells})});const j2=await r2.json();
+    if(!j2.ok)throw new Error(String(j2.error||'שגיאה'));if(!silent)toast(`הסידור הכללי עודכן: ${cells.length} תאים בעמודות המתמחים`,4000)}
+  catch(e){if(!silent)toast('עדכון הסידור הכללי נכשל: '+e.message,5000)}finally{mainBusy=false}}
 function boardTabName(){const[y,m]=ym();return`${ENG_M[m-1]} ${String(y).slice(2)}`}
 function boardSig(rows){const t=rows.map(r=>(r||[]).map(x=>norm(String(x??''))).join('\t').replace(/\t+$/,'')).join('\n').replace(/\n+$/,'');let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return String(h)}
 function boardId(){return((S.settings.boardUrl||'').match(/\/d\/([^/]+)/)||[])[1]}
@@ -1612,6 +1634,7 @@ async function exportBoard(overwrite,silent){
     if(!j.ok){if(j.error==='exists'&&!silent){boardBusy=false;if(confirm(`בלוח התורנויות כבר יש לשונית בשם "${name}". להחליף אותה בלוח הנוכחי?`))return exportBoard(true);return}
       throw new Error(j.error==='action'?'צריך לעדכן את הקוד בגיליון':j.error==='key'?'המפתח לא תואם':String(j.error))}
     M().exportedAt=Date.now();S.boardSync[S.cur]={hash:sig,ts:Date.now()};try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+    syncMainSheet(silent);
     if(!silent){render();toast(`הלוח יוצא ללשונית "${name}" בלוח התורנויות. מעכשיו הוא יתעדכן שם אוטומטית`,4500)}}
   catch(e){if(!silent)toast('הייצוא נכשל: '+e.message,6000)}finally{boardBusy=false}
 }
@@ -1640,7 +1663,7 @@ async function importBoard(manual){
         for(const p of want){const cl=cellOf(p,d);if(!cl.c.includes(pick))setCell(p,d,{c:[...cl.c,pick],mk:cl.mk})}
         changes++})}
     for(let d=1;d<=N;d++)if(isWeekend(d))for(const p of rosterIds()){const cl=cellOf(p,d);if(cl.c.includes('bv')&&cl.c.includes('b')){setCell(p,d,{c:cl.c.filter(x=>x!=='b'),mk:cl.mk})}}
-    S.boardSync[key]={hash:sig,ts:Date.now()};
+    S.boardSync[key]={hash:sig,ts:Date.now()};if(changes)syncMainSheet(true);
     if(changes){if(M().final)addLog(key,`עודכנו ${changes} תאים מתוך לוח התורנויות`);save();render()}else undoStack.pop();
     if(changes||manual)toast(changes?`עודכנו ${changes} שינויים מלוח התורנויות${unknown.size?`. שמות שאינם ברשימת המתמחים (נשמרו כמו שהם בגיליון): ${[...unknown].join(', ')}`:''}`:'אין שינויים בלוח התורנויות',5000)}
   catch(e){if(manual)toast('הקריאה מלוח התורנויות נכשלה: '+e.message,6000)}
