@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">2.11.2026 גרסה 63</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">2.11.2026 גרסה 64</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -341,7 +341,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='2.11.2026 גרסה 63';
+const BUILD='2.11.2026 גרסה 64';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -453,6 +453,10 @@ function blockWin(d,part){const b=(d-1)*1440;return part==='day'?{s:b+540,e:b+12
 function blockHit(pid,x,d0,t){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='off')continue;
   if(!cl.part){if(dd===d0&&!(t&&t.kind==='day'&&isBG(pid)&&/צד\s*[בג]/.test(t.loc||'')))return'יום שלם';continue}
   if(cl.part==='duty'){if(dd===d0&&t&&t.kind==='duty')return`תורנות ב־${dd}`;continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
+/* v64: "מעדיף שלא" באגף א יכול להיות רק ליום או רק ללילה (part), כמו בחסימה */
+function softHit(pid,t,d){if(!t)return false;const x=iv(t.code,d);for(const dd of [d-1,d,d+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='soft')continue;
+  if(!cl.part){if(dd===d)return true;continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return true}return false}
+function softTxt(cl){return cl.part==='day'?'מעדיף שלא יום':cl.part==='night'?'מעדיף שלא לילה':'מעדיף שלא'}
 function blockUnits(pid,g){const u=[];for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);if(cl.mk!=='off')continue;u.push(d);if(g==='A'&&!cl.part)u.push(d)}return u}
 const WCAT={'@day':'משמרת יום','@night':'משמרת לילה','@duty':'תורנות'};
 function wcName(wc){return WCAT[wc]||typeBy(wc)?.name||wc}
@@ -471,7 +475,7 @@ function wkndMorning(t,d){return t.code==='b'&&isWeekend(d)}
 function person(id){return S.people.find(p=>p.id===id)}
 function pname(id){return person(id)?.name||'?'}
 function cellOf(pid,d){return M().cells[pid+'|'+d]||{c:[],mk:''}}
-function setCell(pid,d,cell){const k=pid+'|'+d,old=M().cells[k],mk=cell.mk||'';let wc=cell.wc!==undefined?cell.wc:(old&&old.wc);if(mk!=='want')wc='';let part=cell.part!==undefined?cell.part:(old&&old.part);if(mk!=='off')part='';if(!cell.c.length&&!mk)delete M().cells[k];else{M().cells[k]={c:cell.c.slice(),mk};if(wc)M().cells[k].wc=wc;if(part)M().cells[k].part=part}}
+function setCell(pid,d,cell){const k=pid+'|'+d,old=M().cells[k],mk=cell.mk||'';let wc=cell.wc!==undefined?cell.wc:(old&&old.wc);if(mk!=='want')wc='';let part=cell.part!==undefined?cell.part:(old&&old.part);if(mk!=='off'&&mk!=='soft')part='';if(!cell.c.length&&!mk)delete M().cells[k];else{M().cells[k]={c:cell.c.slice(),mk};if(wc)M().cells[k].wc=wc;if(part)M().cells[k].part=part}}
 function rosterIds(){const R=M().roster;const go={A:0,R:1,X:2};return Object.keys(R).filter(id=>person(id)).sort((a,b)=>(go[R[a].group]-go[R[b].group])||(R[a].order-R[b].order))}
 function need(code,d){const ov=M().needOv[code+'|'+d];if(ov!==undefined)return ov;const t=typeBy(code);if(!t)return 0;const dt=dtype(d);const idx=dt==='hol'?6:dt==='eve'?5:wd(d);return t.need[idx]?1:0}
 function filled(code,d){return rosterIds().filter(id=>cellOf(id,d).c.includes(code))}
@@ -603,7 +607,7 @@ function evaluate(pid,t,d,ctx){
   if(!qualified(pid,t)){hard=true;why.push(`לא מאושר ל${t.name}`)}
   if(t.signer&&isSigner(pid))why.push('חותם שחרור');
   const wk0=isWeekend(d)&&!ctx.days[pid].has(d)&&c.wk===0&&wkNeed(pid);
-  if(mk==='soft'){if(wk0)why.push('ביקש שלא, אבל עוד אין לו סופ״ש');else{score-=8;why.push('ביקש שלא')}}
+  if(softHit(pid,t,d)){const sl=softTxt(cellOf(pid,d).mk==='soft'?cellOf(pid,d):{});if(wk0)why.push('ביקש שלא, אבל עוד אין לו סופ״ש');else{score-=8;why.push(sl==='מעדיף שלא'?'ביקש שלא':sl.replace('מעדיף','ביקש'))}}
   if(wk0){score+=12;why.push('עוד אין לו סופ״ש')}
   if(r.group==='R'&&t.code==='bv'&&ivN24(ctx.iv[pid])>=MAX24R){hard=true;why.push(`כבר ${MAX24R} תורנויות 24 שעות החודש`)}
   if(isBS(pid)){if(t.code==='mc'||t.code==='nc'){hard=true;why.push('מדעי היסוד: 24 שעות רק בסופ״ש')}if(t.kind==='day'||t.code==='z'){score-=40;why.push('מדעי היסוד: בוקר רק בצורך קיצוני')}}
@@ -643,7 +647,7 @@ function can24(pid,d,ctx,mcT,ncT,ignorePid){
    if(ctx.iv[pid].some(y=>(y.d===d-1||y.d===d+1)&&y.ni&&y.k==='shift'))return null}
   const c=ctx.cnt[pid],tg=ctx.tgt[pid];if(c.duty>=tg.D)return null;
   let sc=10*(tg.D-c.duty)/Math.max(tg.D,1)+Math.random()*2;const p=(r.pref||{});if(p.mc===1||p.nc===1)sc+=4;if(p.mc===-1||p.nc===-1)sc-=8;
-  if(cl.mk==='soft')sc-=8;if(cl.mk==='want'&&(!cl.wc||cl.wc==='@duty'||cl.wc==='mc'||cl.wc==='nc'))sc+=6;
+  if(softHit(pid,typeBy('mc'),d)||softHit(pid,typeBy('nc'),d))sc-=8;if(cl.mk==='want'&&(!cl.wc||cl.wc==='@duty'||cl.wc==='mc'||cl.wc==='nc'))sc+=6;
   if(r.group==='A')sc-=1;return sc}
 function autofill(){
   const N=dim(), ids=rosterIds(), sigs=new Set(ids.filter(isSigner));
@@ -739,7 +743,7 @@ function autofill(){
     for(const p of ids)if(isBS(p))cost+=60*(ctx.cnt[p].day||0);
     {const fb=ids.filter(p=>M().roster[p].group==='R'&&!homeOf(p)&&!isICU(p)&&!isBS(p));const mean=fb.reduce((a,p)=>a+ctx.cnt[p].day,0)/Math.max(fb.length,1);for(const p of fb)cost+=4*(ctx.cnt[p].day-mean)**2;
      for(const p of ids)if(isICU(p)&&!homeOf(p))cost+=8*ctx.cnt[p].day}
-    for(const p of picks){if((M().roster[p.pid].pref||{})[p.code]===-1)cost+=5;if(cellOf(p.pid,p.d).mk==='soft')cost+=6}
+    for(const p of picks){if((M().roster[p.pid].pref||{})[p.code]===-1)cost+=5;if(softHit(p.pid,typeBy(p.code),p.d))cost+=6}
     if(!best||cost<best.cost)best={cost,picks,unfilled,noSig:N-covered.size,intN};
   }
   if(!best.picks.length){toast('אין מה להוסיף: משבצות החובה מאוישות ואין מתמחה עם מכסה פנויה');return}
@@ -808,7 +812,7 @@ function renderGrid(){
       const cls=[dayClass(d),cl.mk?'mk-'+cl.mk:'',is?is.lvl:'','cellwrap'].join(' ');
       const ptag=cl.mk==='off'&&cl.part?`<span style="position:absolute;bottom:1px;right:3px;font-size:9.5px;font-weight:700;color:var(--muted)">${cl.part==='day'?'י':cl.part==='duty'?'ת':'ל'}</span>`:'';
       const chips=ptag+cl.c.map(c=>{const t=typeBy(c);return t?`<span class="chip c-${t.color}">${esc(t.short)}</span>`:`<span class="chip c-slate">${esc(c)}</span>`}).join('');
-      const tip=[pname(pid)+', '+fmtDate(d),...cl.c.map(c=>typeBy(c)?.name||c),cl.mk?MARKS[cl.mk]+(cl.wc?': '+wcName(cl.wc):'')+(cl.mk==='off'&&cl.part?': '+PARTS[cl.part]:''):'',...(is?is.msgs:[])].filter(Boolean).join('\n');
+      const tip=[pname(pid)+', '+fmtDate(d),...cl.c.map(c=>typeBy(c)?.name||c),cl.mk?MARKS[cl.mk]+(cl.wc?': '+wcName(cl.wc):'')+((cl.mk==='off'||cl.mk==='soft')&&cl.part?': '+PARTS[cl.part]:''):'',...(is?is.msgs:[])].filter(Boolean).join('\n');
       h+=`<td class="${cls}"><button class="cell" data-p="${pid}" data-d="${d}" title="${esc(tip)}" aria-label="${esc(tip)}">${chips}</button></td>`;
     }
     h+=`</tr>`;
@@ -1135,6 +1139,7 @@ function cellSheet(pid,d){
     if(other.length)h+=`<details style="margin-top:8px"><summary style="color:var(--muted);font-size:13px;cursor:pointer">משמרות של קבוצה אחרת</summary><div class="opts" style="margin-top:6px">${other.map(optBtn).join('')}</div></details>`;
     h+=`<h4>סימון</h4><div class="opts">${Object.entries(MARKS).map(([k,v])=>`<button class="opt" data-mk="${k}" aria-pressed="${(cl.mk||'')===k}">${v}</button>`).join('')}</div>`;
     if(cl.mk==='off'&&r.group==='A')h+=`<h4>מה חסום</h4><div class="opts">${Object.entries(PARTS).map(([k,v])=>`<button class="opt" data-part="${k}" aria-pressed="${(cl.part||'')===k}">${v}</button>`).join('')}</div>`;
+    if(cl.mk==='soft'&&r.group==='A')h+=`<h4>מתי מעדיף שלא</h4><div class="opts">${Object.entries(PARTS).filter(([k])=>k!=='duty').map(([k,v])=>`<button class="opt" data-part="${k}" aria-pressed="${(cl.part||'')===k}">${v}</button>`).join('')}</div>`;
     if(cl.mk==='want')h+=`<h4>איזו משמרת ביקש</h4><div class="opts"><button class="opt" data-wc="" aria-pressed="${!cl.wc}">כל משמרת</button>${Object.entries(WCAT).map(([k,v])=>`<button class="opt" data-wc="${k}" aria-pressed="${cl.wc===k}">${v}</button>`).join('')}${elig.map(t=>`<button class="opt" data-wc="${t.code}" aria-pressed="${cl.wc===t.code}"><span class="chip c-${t.color}">${esc(t.short)}</span>${esc(t.name)}</button>`).join('')}</div>`;
     if(is)h+=`<ul class="issues">${is.msgs.map(m=>`<li class="${is.lvl}">${esc(m)}</li>`).join('')}</ul>`;
     if(r.notes)h+=`<h4>בקשות המתמחה</h4><div class="note">${esc(r.notes)}</div>`;
@@ -1153,7 +1158,7 @@ function cellSheet(pid,d){
     if(b.dataset.autofix){const r=autoFix(pid,d,b.dataset.autofix);sh.el.innerHTML=draw();renderGrid();toast(r,5000);return}
     if(b.dataset.code){pushUndo();const c=b.dataset.code;const arr=cl.c.includes(c)?cl.c.filter(x=>x!==c):[...cl.c,c];setCell(pid,d,{c:arr,mk:cl.mk})}
     else if(b.dataset.mk!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:b.dataset.mk})}
-    else if(b.dataset.part!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:'off',part:b.dataset.part})}
+    else if(b.dataset.part!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:cl.mk==='soft'?'soft':'off',part:b.dataset.part})}
     else if(b.dataset.wc!==undefined){pushUndo();setCell(pid,d,{c:cl.c,mk:'want',wc:b.dataset.wc})}
     else if(b.hasAttribute('data-clearcell')){pushUndo();setCell(pid,d,{c:[],mk:''})}
     else return;
@@ -1210,7 +1215,7 @@ function exportXlsx(){
   const r2=[y];for(let d=1;d<=N;d++)r2.push(WD[wd(d)]);
   const req=[r1,r2];
   for(const pid of ids){const r=M().roster[pid],P=A.per[pid];const row=[pname(pid)];
-    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);row.push([...cl.c,cl.mk==='vac'?'חופש':cl.mk==='off'?(cl.part==='day'?'חסימה-יום':cl.part==='night'?'חסימה-לילה':'חסימה'):cl.mk==='soft'?'שלא':cl.mk==='want'?('רוצה'+(cl.wc?':'+cl.wc:'')):''].filter(Boolean).join(' '))}
+    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);row.push([...cl.c,cl.mk==='vac'?'חופש':cl.mk==='off'?(cl.part==='day'?'חסימה-יום':cl.part==='night'?'חסימה-לילה':'חסימה'):cl.mk==='soft'?(cl.part==='day'?'שלא-יום':cl.part==='night'?'שלא-לילה':'שלא'):cl.mk==='want'?('רוצה'+(cl.wc?':'+cl.wc:'')):''].filter(Boolean).join(' '))}
     row.push(r.group==='A'?'אגף א':r.group==='X'?(r.rot||'לא זמין'):r.rot,r.notes,P.cnt.shift,P.cnt.duty,P.cnt.wk.size,...codes.map(c=>{let n=0;for(let d=1;d<=N;d++)if(cellOf(pid,d).c.includes(c))n++;return n}));
     req.push(row)}
   const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
@@ -1255,7 +1260,7 @@ function importXlsx(file){
         for(let d=1;d<=nd;d++){
           const v=String(aoa[r][c1+d-1]||'').trim(); if(!v)continue;
           const k=p.id+'|'+d; const cl=cells[k]||{c:[],mk:''};
-          for(const tok of v.split(/[\s+,]+/)){if(!tok)continue;let wm;if(tok==='mn'&&codeSet.has('m')&&codeSet.has('n')){for(const x of['m','n'])if(!cl.c.includes(x))cl.c.push(x)}else if(codeSet.has(tok)){if(!cl.c.includes(tok))cl.c.push(tok)}else if(/חופש/.test(tok))cl.mk='vac';else if(/אילוץ|חסימה/.test(tok)){cl.mk='off';if(/יום/.test(tok))cl.part='day';else if(/לילה/.test(tok))cl.part='night'}else if(/^שלא$/.test(tok))cl.mk='soft';else if((wm=tok.match(/^רוצה(?::(\w+))?$/))){cl.mk='want';if(wm[1])cl.wc=wm[1]}else unknown.add(tok)}
+          for(const tok of v.split(/[\s+,]+/)){if(!tok)continue;let wm;if(tok==='mn'&&codeSet.has('m')&&codeSet.has('n')){for(const x of['m','n'])if(!cl.c.includes(x))cl.c.push(x)}else if(codeSet.has(tok)){if(!cl.c.includes(tok))cl.c.push(tok)}else if(/חופש/.test(tok))cl.mk='vac';else if(/אילוץ|חסימה/.test(tok)){cl.mk='off';if(/יום/.test(tok))cl.part='day';else if(/לילה/.test(tok))cl.part='night'}else if(/^שלא(-יום|-לילה)?$/.test(tok)){cl.mk='soft';if(/יום/.test(tok))cl.part='day';else if(/לילה/.test(tok))cl.part='night'}else if((wm=tok.match(/^רוצה(?::(\w+))?$/))){cl.mk='want';if(wm[1])cl.wc=wm[1]}else unknown.add(tok)}
           if(cl.c.length||cl.mk)cells[k]=cl;
         }
       }
@@ -1412,12 +1417,12 @@ function loadRQ(keep){
   const mo=S.months[RQ.m], p=findPerson(RQ.name);
   const clear=()=>{RQ.b=new Set();RQ.s=new Set();RQ.w=new Map()};
   if(!mo||!p||!mo.roster[p.id]){if(!keep)clear();return}
-  const r=mo.roster[p.id], bp=new Map(), b=new Set(), s=new Set(), w=new Map();
+  const r=mo.roster[p.id], bp=new Map(), sp=new Map(), b=new Set(), s=new Set(), w=new Map();
   if(r.group==='A'||r.group==='R'){RQ.g=r.group;RQ.rot=r.group==='R'?r.rot:''}
   for(let d=1;d<=kDim(RQ.m);d++){const cl=mo.cells[p.id+'|'+d];if(!cl)continue;
-    if(cl.mk==='off'){b.add(d);if(cl.part)bp.set(d,cl.part)}else if(cl.mk==='soft')s.add(d);else if(cl.mk==='want')w.set(d,cl.wc||'')}
+    if(cl.mk==='off'){b.add(d);if(cl.part)bp.set(d,cl.part)}else if(cl.mk==='soft'){s.add(d);if(cl.part)sp.set(d,cl.part)}else if(cl.mk==='want')w.set(d,cl.wc||'')}
   if(keep&&!b.size&&!s.size&&!w.size&&!r.reqAt)return;
-  RQ.b=b;RQ.bp=bp;RQ.s=s;RQ.w=w;RQ.t=r.notes||'';
+  RQ.b=b;RQ.bp=bp;RQ.s=s;RQ.sp=sp;RQ.w=w;RQ.t=r.notes||'';
 }
 function rulesBox(g,key){
   const r=S.settings.req;
@@ -1426,7 +1431,7 @@ function rulesBox(g,key){
   <li>רוטציה: אפשר לחסום עד ${r.R} תאריכים לתורנויות, מתוכם עד ${r.wkR} בסופ״ש או בחג.</li>
   <li>לא כל החסימות יכולות להיות בסופ״ש.</li>
   <li>אפשר לבקש משמרות מסוימות שרוצים לעשות.</li>
-  <li>מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות.</li>
+  <li>מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות. באגף א אפשר לבחור אם מעדיפים שלא את כל היום, רק את היום (09–21) או רק את הלילה (21–09).</li>
   ${r.deadline?`<li>מועד אחרון להגשה: ${esc(r.deadline)}.</li>`:''}</ul></div>`;
 }
 function renderRequest(){
@@ -1464,10 +1469,10 @@ function renderRequest(){
 function b64e(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))))}
 function b64d(s){return JSON.parse(decodeURIComponent(escape(atob(s))))}
 function rqUnits(){return[...RQ.b].flatMap(d=>RQ.g==='A'&&!(RQ.bp&&RQ.bp.get(d))?[d,d]:[d])}
-function buildReq(){const bp=[...RQ.b].filter(d=>RQ.bp&&RQ.bp.get(d)).map(d=>[d,RQ.bp.get(d)]);return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),bp,bu:[...RQ.b].flatMap(d=>RQ.g==='A'&&!(RQ.bp&&RQ.bp.get(d))?[d,d]:[d]),b:[...RQ.b].sort((a,b)=>a-b),s:[...RQ.s].sort((a,b)=>a-b),w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
+function buildReq(){const bp=[...RQ.b].filter(d=>RQ.bp&&RQ.bp.get(d)).map(d=>[d,RQ.bp.get(d)]);return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),bp,bu:[...RQ.b].flatMap(d=>RQ.g==='A'&&!(RQ.bp&&RQ.bp.get(d))?[d,d]:[d]),b:[...RQ.b].sort((a,b)=>a-b),s:[...RQ.s].sort((a,b)=>a-b),sp:[...RQ.s].filter(d=>RQ.sp&&RQ.sp.get(d)).map(d=>[d,RQ.sp.get(d)]),w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
 function reqMessage(q){
   const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.b.length}): ${q.b.join(', ')||'אין'}`];
-  if(q.s.length)L.push(`מעדיף שלא: ${q.s.join(', ')}`);
+  if(q.s.length)L.push(`מעדיף שלא: ${q.s.map(d=>{const p=((q.sp||[]).find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':'לילה'})`:String(d)}).join(', ')}`);
   if(q.w.length)L.push(`רוצה לעבוד: ${q.w.map(([d,c])=>c?`${d} (${typeBy(c)?.name||c})`:String(d)).join(', ')}`);
   if(q.t)L.push(`הערות: ${q.t}`);
   L.push('','#REQ:'+b64e(q));
@@ -1492,7 +1497,7 @@ function applyRequest(q){
   for(let d=1;d<=N;d++){const k=p.id+'|'+d,cl=mo.cells[k];if(cl&&clr.includes(cl.mk)){cl.mk='';delete cl.wc;if(!cl.c.length)delete mo.cells[k]}}
   const put=(d,mk,wc,part)=>{d=Number(d);if(!(d>=1&&d<=N))return;const k=p.id+'|'+d,cl=mo.cells[k]||{c:[],mk:''};cl.mk=mk;if(wc)cl.wc=wc;else delete cl.wc;if(part)cl.part=part;else delete cl.part;mo.cells[k]=cl};
   const bpm=new Map(q.bp||[]);
-  (q.vac||[]).forEach(d=>put(d,'vac'));(q.b||[]).forEach(d=>put(d,'off','',q.g==='A'?bpm.get(d):''));(q.s||[]).forEach(d=>put(d,'soft'));(q.w||[]).forEach(([d,c])=>put(d,'want',c));
+  (q.vac||[]).forEach(d=>put(d,'vac'));(q.b||[]).forEach(d=>put(d,'off','',q.g==='A'?bpm.get(d):''));const spm=new Map(q.sp||[]);(q.s||[]).forEach(d=>put(d,'soft','',q.g==='A'?spm.get(d):''));(q.w||[]).forEach(([d,c])=>put(d,'want',c));
   return{p,isNew,mismatch:(r.group==='A'||r.group==='R')&&r.group!==q.g};
 }
 function sendSheet(){
@@ -1513,7 +1518,7 @@ function renderInbox(){
   let sub=0;
   const rows=ids.map(pid=>{
     const r=M().roster[pid]; const b=[],s=[],w=[];
-    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);if(cl.mk==='off')b.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='soft')s.push(d);else if(cl.mk==='want')w.push(d)}
+    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);if(cl.mk==='off')b.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='soft')s.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='want')w.push(d)}
     const chk=checkBlocks(S.cur,r.group==='R'?'R':'A',blockUnits(pid,r.group==='R'?'R':'A')); if(r.reqAt)sub++;
     return{pid,r,b,s,w,chk};
   });
@@ -1724,7 +1729,7 @@ function pendingCard(q,i){
   <div class="row"><button class="btn small primary" data-approve="${i}">אשר</button><button class="btn small danger" data-reject="${i}">דחה</button></div></div>
   <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p[1]==='day'?'יום':p[1]==='duty'?'תורנות':'לילה'):''})`}).join(', '))||'אין'}</div>
   ${q.vac&&q.vac.length?`<div><b>${q.vre&&q.vre!=='חופשה'?esc(q.vre):`חופשה מאושרת (אישר: ${esc(q.vby||'לא צוין')})`}:</b> ${esc(dl(q.vac))}</div>`:''}
-  ${q.s.length?`<div><b>מעדיף שלא:</b> ${esc(dl(q.s))}</div>`:''}
+  ${q.s.length?`<div><b>מעדיף שלא:</b> ${esc(q.s.map(d=>{const p=((q.sp||[]).find(x=>x[0]===d)||[])[1];return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p==='day'?'יום':'לילה'):''})`}).join(', '))}</div>`:''}
   ${q.w.length?`<div><b>רוצה לעבוד:</b> ${esc(q.w.map(([d,c])=>c?`${d} (${typeBy(c)?.name||c})`:String(d)).join(', '))}</div>`:''}
   ${q.t?`<div><b>הערות:</b> ${esc(q.t)}</div>`:''}
   ${chk.errs.map(e=>`<div class="errs">${esc(e)}</div>`).join('')}${notes.map(n=>`<div style="color:var(--warn);font-weight:600">${esc(n)}</div>`).join('')}</div></div>`;

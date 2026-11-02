@@ -260,6 +260,8 @@ function kWeekend(key,d){const w=kWd(key,d);return w===5||w===6||!!hol(key)[d]}
 function kLabel(key){const[y,m]=key.split('-').map(Number);return`${HEB_MONTHS[m-1]} ${y}`}
 function monthOpts(){const n=new Date(),o=[];for(let i=0;i<3;i++){const dt=new Date(n.getFullYear(),n.getMonth()+i,1);o.push(`${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`)}return o}
 const PART={'':'כל היום',day:'יום 09–21',night:'לילה 21–09',duty:'תורנות 16–08'};
+const SPART={'':'כל היום',day:'בוקר / יום 09–21',night:'לילה 21–09'};
+function softLabel(p){return p==='day'?'עדיף שלא יום':p==='night'?'עדיף שלא לילה':'עדיף שלא'}
 function units(){const u=[];for(const[d,p]of RQ.b){u.push(d);if(RQ.g==='A'&&!p)u.push(d)}return u}
 function blockLabel(p){return RQ.g==='A'&&p?(p==='day'?'חסום יום':p==='duty'?'חסום תורנות':'חסום לילה'):'חסום'}
 function ruleModal(title,lines){openSheet(`<h3>${esc(title)}</h3><ul class="issues" style="padding-right:18px;margin-top:8px">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="foot"><button class="btn primary" data-close>הבנתי</button></div>`)}
@@ -273,7 +275,7 @@ const DKEY='ed-request-draft-v1';
 function blank(){return{m:monthOpts()[1],name:'',g:'A',rot:'',b:[],s:[],w:[],vac:[],vby:'איתי',vre:'חופשה',t:'',mode:'b',wcode:''}}
 let RQ;try{RQ=JSON.parse(localStorage.getItem(DKEY)||'null')}catch(e){RQ=null}
 if(!RQ||!monthOpts().includes(RQ.m))RQ={...blank(),...(RQ?{name:RQ.name,g:RQ.g,rot:RQ.rot}:{})};
-RQ.b=new Map((RQ.b||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.bpart)RQ.bpart='';RQ.s=new Set(RQ.s);RQ.w=new Map(RQ.w);RQ.vac=new Set(RQ.vac||[]);if(RQ.vby===undefined)RQ.vby='איתי';if(!RQ.vre)RQ.vre='חופשה';
+RQ.b=new Map((RQ.b||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.bpart)RQ.bpart='';RQ.s=new Map((RQ.s||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.spart)RQ.spart='';RQ.w=new Map(RQ.w);RQ.vac=new Set(RQ.vac||[]);if(RQ.vby===undefined)RQ.vby='איתי';if(!RQ.vre)RQ.vre='חופשה';
 let VIEW='req';try{VIEW=localStorage.getItem('ed-request-view')||'req'}catch(e){}
 const CH={m:monthOpts()[0],kind:'swap',d1:'',c1:'',w:'',d2:'',c2:'',agree:false,t:''};
 function setView(v){VIEW=v;try{localStorage.setItem('ed-request-view',v)}catch(e){}render()}
@@ -363,7 +365,7 @@ function renderChg(){
   <div class="row" style="margin-top:12px"><button class="btn primary" id="chSend">${API?'שלח בקשה':'הכן הודעה לשליחה'}</button></div></div>`;
   $('#main').innerHTML=h;
 }
-function persist(){try{localStorage.setItem(DKEY,JSON.stringify({...RQ,b:[...RQ.b.entries()],s:[...RQ.s],w:[...RQ.w],vac:[...RQ.vac]}))}catch(e){}}
+function persist(){try{localStorage.setItem(DKEY,JSON.stringify({...RQ,b:[...RQ.b.entries()],s:[...RQ.s.entries()],w:[...RQ.w],vac:[...RQ.vac]}))}catch(e){}}
 
 let PLAN=null;try{PLAN=JSON.parse(localStorage.getItem('ed-plan-v1')||'null')}catch(e){}
 let DEADLINES={'2026-10':'2026-09-29T09:00'};try{Object.assign(DEADLINES,JSON.parse(localStorage.getItem('ed-deadlines')||'{}'))}catch(e){}
@@ -390,7 +392,7 @@ function render(){
   <li>רוטציה: אפשר לחסום עד ${RULES.R} תאריכים לתורנויות, מתוכם עד ${RULES.wkR} בסופ״ש או בחג.</li>
   <li>לא כל החסימות יכולות להיות בסופ״ש.</li>
   <li>אפשר לבקש משמרות מסוימות שרוצים לעשות.</li>
-  <li>מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות.</li>
+  <li>מעבר לחסימות אפשר לסמן ימים שמעדיפים שלא לעבוד. נשתדל להתחשב ככל האפשר, בלי התחייבות. באגף א אפשר לבחור אם מעדיפים שלא את כל היום, רק את היום (09–21) או רק את הלילה (21–09).</li>
   <li>מילואים, קורס וחופשה שאושרה מראש מסמנים בנפרד, במצב "חופשה / מילואים", עם שם מי שאישר. היא לא נספרת בחסימות, ומספר המשמרות והתורנויות יורד לפי החלק היחסי של החודש.</li>
   <li>אחרי שהלוח מפורסם, כל החלפה או שינוי צריכים אישור של רכז/ת השיבוץ. עושים את זה בלשונית "בקשת החלפה".</li></ul></div>
   ${closed(RQ.m)?`<div class="rules" style="background:var(--danger-bg);color:var(--danger);font-weight:600">ההגשה ל${kLabel(RQ.m)} ננעלה ב־${dlText(RQ.m)}. לשינוי אחרי הנעילה, פנו לרכז/ת השיבוץ או שלחו בקשת החלפה אחרי פרסום הלוח.</div>`:dl(RQ.m)?`<div class="rules"><strong>מועד אחרון להגשה ל${kLabel(RQ.m)}: ${dlText(RQ.m)}</strong>אחרי המועד המערכת ננעלת. עד אז אפשר לשנות ולשלוח שוב, והבקשה האחרונה קובעת.</div>`:''}
@@ -409,6 +411,7 @@ function render(){
     <button data-rqmode="v" aria-pressed="${RQ.mode==='v'}">חופשה / מילואים (${RQ.vac.size})</button></span>
     ${RQ.mode==='v'||RQ.vac.size?`<select id="rqVre" aria-label="סיבה" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px">${['חופשה','מילואים','קורס'].map(x=>`<option ${RQ.vre===x?'selected':''}>${x}</option>`).join('')}</select>${RQ.vre==='חופשה'?`<label style="font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px">מי אישר<input type="text" id="rqVby" value="${esc(RQ.vby)}" style="width:110px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px"></label>`:''}`:''}
     ${RQ.mode==='b'&&RQ.g==='A'?`<span class="seg" role="group" aria-label="מה לחסום">${Object.entries(PART).map(([k,v])=>`<button data-bpart="${k}" aria-pressed="${RQ.bpart===k}">${v}</button>`).join('')}</span>`:''}
+    ${RQ.mode==='s'&&RQ.g==='A'?`<span class="seg" role="group" aria-label="מתי מעדיף שלא">${Object.entries(SPART).map(([k,v])=>`<button data-spart="${k}" aria-pressed="${RQ.spart===k}">${v}</button>`).join('')}</span>`:''}
     ${RQ.mode==='w'?`<select id="rqWcode" aria-label="איזו משמרת" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px"><option value="">כל משמרת</option>${WANT[RQ.g].map(([c,n])=>`<option value="${c}" ${RQ.wcode===c?'selected':''}>${esc(n)}</option>`).join('')}</select>`:''}
   </div>
   <p class="hint" style="margin:8px 0 0">בחרו מה לסמן ולחצו על הימים. לחיצה נוספת מבטלת.</p>
@@ -417,7 +420,7 @@ function render(){
   <div class="cal">${WD.map(w=>`<div class="wdh">${w}</div>`).join('')}${'<div></div>'.repeat(kWd(key,1))}`;
   for(let d=1;d<=N;d++){
     const hd=H[d];let cls='d '+(hd&&hd.t==='hol'?'hol':kWeekend(key,d)?'wke':''),lab='';
-    if(RQ.vac.has(d)){cls+=' vac';lab='חופשה'}else if(RQ.b.has(d)){cls+=' b';lab=blockLabel(RQ.b.get(d))}else if(RQ.s.has(d)){cls+=' s';lab='עדיף שלא'}else if(RQ.w.has(d)){cls+=' w';const c=RQ.w.get(d);lab=c?(TSHORT[c]||c):'רוצה'}
+    if(RQ.vac.has(d)){cls+=' vac';lab='חופשה'}else if(RQ.b.has(d)){cls+=' b';lab=blockLabel(RQ.b.get(d))}else if(RQ.s.has(d)){cls+=' s';lab=softLabel(RQ.s.get(d))}else if(RQ.w.has(d)){cls+=' w';const c=RQ.w.get(d);lab=c?(TSHORT[c]||c):'רוצה'}
     h+=`<button class="${cls}" data-rqday="${d}" title="${esc(hd?hd.name:'')}" aria-label="${d} ב${kLabel(key)}${hd?', '+hd.name:''}${lab?', '+lab:''}"><span class="num">${d}</span><small>${esc(lab)}</small></button>`;
   }
   h+=`</div><label style="display:block;font-size:13px;color:var(--muted);margin-bottom:4px" for="rqNotes">בקשות נוספות והערות</label><textarea id="rqNotes" placeholder="למשל: מעדיף לילות">${esc(RQ.t)}</textarea>
@@ -426,10 +429,10 @@ function render(){
 }
 function quota(){const f=Math.max(0,1-RQ.vac.size/kDim(RQ.m));return RQ.g==='A'?`מכסה משוערת: ${Math.round(BASE.AS*f)} משמרות ו־${Math.round(BASE.AD*f)} תורנויות`:`מכסה משוערת: ${Math.round(BASE.RD*f)} תורנויות`}
 function b64e(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))))}
-function buildReq(){return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),vac:[...RQ.vac].sort((a,b)=>a-b),vby:RQ.vre&&RQ.vre!=='חופשה'?RQ.vre:norm(RQ.vby),vre:RQ.vre||'חופשה',b:[...RQ.b.keys()].sort((a,b)=>a-b),bp:RQ.g==='A'?[...RQ.b].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],bu:units().sort((a,b)=>a-b),s:[...RQ.s].sort((a,b)=>a-b),w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
+function buildReq(){return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),vac:[...RQ.vac].sort((a,b)=>a-b),vby:RQ.vre&&RQ.vre!=='חופשה'?RQ.vre:norm(RQ.vby),vre:RQ.vre||'חופשה',b:[...RQ.b.keys()].sort((a,b)=>a-b),bp:RQ.g==='A'?[...RQ.b].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],bu:units().sort((a,b)=>a-b),s:[...RQ.s.keys()].sort((a,b)=>a-b),sp:RQ.g==='A'?[...RQ.s].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
 function message(q){const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.bu.length}${q.g==='A'?' משמרות':''}): ${q.b.map(d=>{const p=(q.bp.find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':p==='duty'?'תורנות':'לילה'})`:String(d)}).join(', ')||'אין'}`];
   if(q.vac.length)L.push(q.vre&&q.vre!=='חופשה'?`${q.vre} (${q.vac.length} ימים): ${q.vac.join(', ')}`:`חופשה מאושרת (${q.vac.length} ימים, אישר: ${q.vby}): ${q.vac.join(', ')}`);
-  if(q.s.length)L.push(`מעדיף שלא: ${q.s.join(', ')}`);
+  if(q.s.length)L.push(`מעדיף שלא: ${q.s.map(d=>{const p=((q.sp||[]).find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':'לילה'})`:String(d)}).join(', ')}`);
   if(q.w.length)L.push(`רוצה לעבוד: ${q.w.map(([d,c])=>c?`${d} (${TNAME[c]||c})`:String(d)).join(', ')}`);
   if(q.t)L.push(`הערות: ${q.t}`);L.push('','#REQ:'+b64e(q));return L.join('\n')}
 function openSheet(html){const layer=$('#layer');layer.innerHTML=`<div class="overlay"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;const ov=layer.firstChild;
@@ -462,6 +465,7 @@ document.addEventListener('click',e=>{
     if(q.t)L.push('הערה: '+q.t);L.push('','#CHG:'+b64e(q));sendQ(q,L.join('\n'),'בקשת ההחלפה נשלחה. השינוי ייכנס ללוח רק אחרי אישור.');
     return}
   if(b.dataset.bpart!==undefined){RQ.bpart=b.dataset.bpart;persist();render();return}
+  if(b.dataset.spart!==undefined){RQ.spart=b.dataset.spart;persist();render();return}
   if(b.dataset.rqg){RQ.g=b.dataset.rqg;RQ.wcode='';persist();render();return}
   if(b.dataset.rqmode){RQ.mode=b.dataset.rqmode;persist();render();return}
   if(b.dataset.rqday){const d=Number(b.dataset.rqday);
@@ -479,10 +483,10 @@ document.addEventListener('click',e=>{
             'לימים נוספים סמנו "מעדיף שלא". נשתדל להתחשב, בלי התחייבות.',
             'חופשה שאושרה מראש לא נספרת בחסימות. סמנו אותה ב"חופשה מאושרת".']);return}
         RQ.s.delete(d);RQ.w.delete(d);RQ.vac.delete(d)}}
-    else if(RQ.mode==='s'){RQ.vac.delete(d);if(RQ.s.has(d))RQ.s.delete(d);else{RQ.s.add(d);RQ.b.delete(d);RQ.w.delete(d)}}
+    else if(RQ.mode==='s'){RQ.vac.delete(d);const sp=RQ.g==='A'?RQ.spart:'';if(RQ.s.has(d)&&RQ.s.get(d)===sp)RQ.s.delete(d);else{RQ.s.set(d,sp);RQ.b.delete(d);RQ.w.delete(d)}}
     else{RQ.vac.delete(d);if(RQ.w.has(d)&&RQ.w.get(d)===RQ.wcode)RQ.w.delete(d);else{RQ.w.set(d,RQ.wcode);RQ.b.delete(d);RQ.s.delete(d)}}
     persist();render();return}
-  if(b.id==='rqReset'){if(!confirm('לנקות את כל הסימונים?'))return;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();persist();render();return}
+  if(b.id==='rqReset'){if(!confirm('לנקות את כל הסימונים?'))return;RQ.b=new Map();RQ.s=new Map();RQ.w=new Map();RQ.vac=new Set();persist();render();return}
   if(b.id==='rqSend'){
     if(closed(RQ.m)){toast('ההגשה לחודש הזה ננעלה');return}
     if(!norm(RQ.name)){toast('כתבו את השם שלכם');$('#rqName').focus();return}
@@ -493,7 +497,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('input',e=>{const id=e.target.id;if(id==='chT'){CH.t=e.target.value;return}if(id==='rqNotes')RQ.t=e.target.value;else if(id==='rqRot')RQ.rot=e.target.value;else if(id==='rqName')RQ.name=e.target.value;else if(id==='rqVre'){RQ.vre=e.target.value;persist();render();return}else if(id==='rqVby')RQ.vby=e.target.value;else return;persist()});
 document.addEventListener('change',e=>{const id=e.target.id;
-  if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Set();RQ.w=new Map();RQ.vac=new Set();autoGroup();persist();render()}
+  if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Map();RQ.w=new Map();RQ.vac=new Set();autoGroup();persist();render()}
   else if(id==='rqName'){RQ.name=e.target.value;if(planRow(RQ.name))autoGroup();persist();render()}
   else if(id==='chN'||id==='swN'){RQ.name=e.target.value;SWSEL='';persist();render()}
   else if(id==='chW'){CH.w=e.target.value}
