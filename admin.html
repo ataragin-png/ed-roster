@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">3.11.2026 גרסה 65</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">3.11.2026 גרסה 66</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,7 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+if(!S.v19){S.v19=1;const ab=S.people.find(p=>norm(p.name)==='אברהם');if(ab){ab.rules=ab.rules||{};if(ab.rules.dbl===undefined)ab.rules.dbl=true}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v18){S.v18=1;const as=S.people.find(p=>norm(p.name)==='אשר');if(as){as.rules=as.rules||{};if(as.rules.aS===undefined)as.rules.aS=10}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v17){S.v17=1;try{S.nameAliases=S.nameAliases||{};const dv=S.people.find(p=>norm(p.name)==='דוד');if(dv&&!S.nameAliases[nameKey('טרגין')])S.nameAliases[nameKey('טרגין')]=dv.id;
   const mm=S.people.find(p=>norm(p.name)==='מוחמד מיסק');if(mm&&S.rotPlan&&S.rotPlan[mm.id])for(const k of Object.keys(S.rotPlan[mm.id]))if(k<'2026-01')delete S.rotPlan[mm.id][k];
@@ -342,7 +343,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='3.11.2026 גרסה 65';
+const BUILD='3.11.2026 גרסה 66';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -457,6 +458,9 @@ function blockHit(pid,x,d0,t){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())
 /* v64: "מעדיף שלא" באגף א יכול להיות רק ליום או רק ללילה (part), כמו בחסימה */
 function softHit(pid,t,d){if(!t)return false;const x=iv(t.code,d);for(const dd of [d-1,d,d+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='soft')continue;
   if(!cl.part){if(dd===d)return true;continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return true}return false}
+/* v66: כלל אישי "כפולה": באגף א מעדיף בוקר+לילה באותו יום (24 ש׳, נספר כשתי משמרות) */
+function dblPair(pid,t,d,ctx){const r=M().roster[pid];if(!r||r.group!=='A'||!rulesOf(pid).dbl||!t||(t.code!=='m'&&t.code!=='n'))return null;
+  const same=ctx.iv[pid].filter(y=>y.d===d&&!y.x);if(same.length!==1)return null;const y=same[0];return y.c===(t.code==='m'?'n':'m')?y:null}
 function softTxt(cl){return cl.part==='day'?'מעדיף שלא יום':cl.part==='night'?'מעדיף שלא לילה':'מעדיף שלא'}
 function blockUnits(pid,g){const u=[];for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);if(cl.mk!=='off')continue;u.push(d);if(g==='A'&&!cl.part)u.push(d)}return u}
 const WCAT={'@day':'משמרת יום','@night':'משמרת לילה','@duty':'תורנות'};
@@ -574,10 +578,13 @@ function evaluate(pid,t,d,ctx){
   const cl0=cellOf(pid,d),mk=cl0.mk;
   if(mk==='vac'){hard=true;why.push('חופש')}
   {const bh=blockHit(pid,iv(t.code,d),d,t);if(bh){hard=true;why.push(`חסום: ${bh}`)}}
-  if(ctx.days[pid].has(d)){hard=true;why.push('כבר משובץ ביום זה')}
+  const dbl=dblPair(pid,t,d,ctx);
+  if(ctx.days[pid].has(d)&&!dbl){hard=true;why.push('כבר משובץ ביום זה')}
+  if(dbl){score+=22;why.push('משלים כפולה 24 ש׳ (מעדיף)')}
   if(t.loc){const x0=iv(t.code,d);const o=(ctx.occ[t.loc]||[]).find(y=>y.pid!==pid&&x0.s<y.e&&y.s<x0.e);if(o){hard=true;why.push(`${t.loc} תפוס (${pname(o.pid)})`)}}
   const x=iv(t.code,d);
   for(const y of ctx.iv[pid]){
+    if(y===dbl)continue;
     if(x.s<y.e&&y.s<x.e){hard=true;why.push('חפיפה');break}
     const gap=x.s>=y.e?x.s-y.e:y.s-x.e;
     if(gap<st.minRest*60){hard=true;why.push(`מנוחה ${Math.round(gap/60)} ש׳`);break}
@@ -953,11 +960,12 @@ function planPanel(){
 function rulesPanel(){
   const ppl=[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he'));const withR=ppl.filter(p=>p.rules&&Object.keys(p.rules).length);
   let h=`<div class="panel"><h2>כללים אישיים</h2><p class="hint">הסכמות מיוחדות למתמחה מסוים. הן חלות על כל החודשים, והשיבוץ האוטומטי מכבד אותן.</p>`;
-  if(withR.length)h+=`<div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>משמרות בחודש מלר״ד</th><th>תורנויות בחודש רוטציה</th><th>בחודשי מלר״ד: לא עובד מליל שישי 21:00 עד מוצ״ש 21:00</th><th>בחודשי מלר״ד: משמרת יום שישי נספרת כ</th><th>לא לשבץ ב</th><th></th></tr></thead><tbody>${withR.map(p=>{const ru=p.rules;return`<tr data-rp="${p.id}"><td><strong>${esc(p.name)}</strong></td>
+  if(withR.length)h+=`<div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>משמרות בחודש מלר״ד</th><th>תורנויות בחודש רוטציה</th><th>בחודשי מלר״ד: לא עובד מליל שישי 21:00 עד מוצ״ש 21:00</th><th>בחודשי מלר״ד: משמרת יום שישי נספרת כ</th><th>בחודשי מלר״ד: מעדיף כפולה 24 ש׳ (בוקר+לילה)</th><th>לא לשבץ ב</th><th></th></tr></thead><tbody>${withR.map(p=>{const ru=p.rules;return`<tr data-rp="${p.id}"><td><strong>${esc(p.name)}</strong></td>
     <td><input type="number" min="0" data-ru="aS" value="${ru.aS??''}" placeholder="${S.settings.baseAS}" title="מכסת משמרות בסיס בחודש מלר״ד (לפני הפחתת חופש)"></td>
     <td><input type="number" min="0" data-ru="rotD" value="${ru.rotD??''}" placeholder="${S.settings.baseRD}"></td>
     <td style="text-align:center"><input type="checkbox" data-ru="shabbat" ${ru.shabbat?'checked':''}></td>
     <td><select data-ru="friLong">${[['one','משמרת אחת'],['two','2 משמרות'],['duty','תורנות']].map(([k,v])=>`<option value="${k}" ${(ru.friLong||'one')===k?'selected':''}>${v}</option>`).join('')}</select></td>
+    <td style="text-align:center"><input type="checkbox" data-ru="dbl" ${ru.dbl?'checked':''}></td>
     <td><div class="prefchips">${S.types.filter(t=>t.kind==='duty'||t.kind==='shift').map(t=>`<button data-runo="${t.code}" class="${(ru.noCodes||[]).includes(t.code)?'avoid':''}" title="${esc(t.name)}">${esc(t.short)}</button>`).join('')}</div></td>
     <td><button class="btn small danger" data-rudel="${p.id}">הסר</button></td></tr>`}).join('')}</tbody></table></div>`;
   h+=`<div class="row" style="margin-top:10px"><select id="ruAdd"><option value="">הוסף כללים למתמחה…</option>${ppl.filter(p=>!withR.includes(p)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div></div>`;
@@ -1933,7 +1941,7 @@ $('#main').addEventListener('change',e=>{
   const tr=el.closest('tr[data-pid]');
   if(el.id==='ruAdd'&&el.value){const p=person(el.value);p.rules={};save();renderPeople();return}
   if(el.dataset.ru){const p=person(el.closest('tr[data-rp]').dataset.rp);p.rules=p.rules||{};const k=el.dataset.ru;
-    if(k==='shabbat')p.rules.shabbat=el.checked;else if(k==='rotD'||k==='aS'){if(el.value==='')delete p.rules[k];else p.rules[k]=Number(el.value)}else p.rules[k]=el.value;save();return}
+    if(k==='shabbat'||k==='dbl')p.rules[k]=el.checked;else if(k==='rotD'||k==='aS'){if(el.value==='')delete p.rules[k];else p.rules[k]=Number(el.value)}else p.rules[k]=el.value;save();return}
   if(el.dataset.alias){const p=person(el.dataset.alias);const v=norm(el.value);if(v)p.sheetName=v;else delete p.sheetName;save();syncProgram(false);return}
   if(el.dataset.plan){const[pid,k]=el.dataset.plan.split('|');S.rotPlan=S.rotPlan||{};S.rotPlanManual=S.rotPlanManual||{};const v=norm(el.value);S.rotPlan[pid]=S.rotPlan[pid]||{};if(v){S.rotPlan[pid][k]=v;S.rotPlanManual[pid+'|'+k]=true}else{delete S.rotPlan[pid][k];delete S.rotPlanManual[pid+'|'+k]}
     if(S.months[k]&&v){if(S.months[k].final&&!confirm(`הלוח של ${kLabel(k)} כבר אושר סופית. לעדכן בו גם את הקבוצה?`)){save();return}applyPlan(k)}save();renderPeople();return}
