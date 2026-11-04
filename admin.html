@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 72</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 73</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -345,7 +345,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 72';
+const BUILD='4.11.2026 גרסה 73';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -477,6 +477,8 @@ function softHit(pid,t,d){if(!t)return false;const x=iv(t.code,d);for(const dd o
 /* v66: כלל אישי "כפולה": באגף א מעדיף בוקר+לילה באותו יום (24 ש׳, נספר כשתי משמרות) */
 function dblPair(pid,t,d,ctx){const r=M().roster[pid];if(!r||r.group!=='A'||!rulesOf(pid).dbl||!t||(t.code!=='m'&&t.code!=='n'))return null;
   const same=ctx.iv[pid].filter(y=>y.d===d&&!y.x);if(same.length!==1)return null;const y=same[0];return y.c===(t.code==='m'?'n':'m')?y:null}
+/* v73: 24 ש׳ במהלכים כירורגיה רק לרוטציה בפנימית, ב+ג או כירורגיה, ולמי שמסומן "מעדיף כפולה" (אברהם) */
+function allow24(pid){const r=M().roster[pid];if(!r)return false;if(r.group==='A')return!!rulesOf(pid).dbl;if(r.group!=='R')return false;return/פנימית|ב\s*\+\s*ג|צד\s*[בג]|אגף\s*ב|כירורגיה/.test(r.rot||'')}
 function softTxt(cl){return cl.part==='day'?'מעדיף שלא יום':cl.part==='night'?'מעדיף שלא לילה':'מעדיף שלא'}
 function blockUnits(pid,g){const u=[];for(let d=1;d<=dim();d++){const cl=cellOf(pid,d);if(cl.mk!=='off')continue;u.push(d);if(g==='A'&&!cl.part)u.push(d)}return u}
 const WCAT={'@day':'משמרת יום','@night':'משמרת לילה','@duty':'תורנות'};
@@ -540,7 +542,8 @@ function analyze(){
         if(r.group==='X')add(pid,d,'warn','המתמחה מסומן כלא זמין החודש');
         else if(!groupOk(t,r.group))add(pid,d,'warn',`${t.name} לא מיועד ל${GROUPS[r.group]}`);
       }
-      if(r.group==='A'&&cl.c.includes('mc')&&cl.c.includes('nc')){cnt.shift-=2;cnt.duty++;if(!rulesOf(pid).dbl)add(pid,d,'err','באגף א לא עושים 24 ש׳ במהלכים כירורגיה (רק אברהם ורוטציה). לפצל 12/12')}
+      if(r.group==='A'&&cl.c.includes('mc')&&cl.c.includes('nc')){cnt.shift-=2;cnt.duty++}
+      if(cl.c.includes('mc')&&cl.c.includes('nc')&&!allow24(pid))add(pid,d,'err','24 ש׳ במהלכים כירורגיה רק לרוטציה בפנימית, ב+ג או כירורגיה. לפצל 12/12')
       if(isICU(pid)&&(cl.c.includes('mc')||cl.c.includes('nc')))add(pid,d,'err','ברוטציית ICU לא חוזרים למהלכים כירורגיה')
       if(r.group==='R'){const sh=cl.c.filter(c=>c==='mc'||c==='nc').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
       if(cl.c.length&&cl.mk==='vac')add(pid,d,'err','שובץ ביום חופש');
@@ -664,7 +667,7 @@ function uncommit(ctx,pid,t,d){if(t.internal&&isWeekend(d))ctx.intWk--;const x=i
 function can24(pid,d,ctx,mcT,ncT,ignorePid){
   const r=M().roster[pid],st=S.settings;if(!r||(r.group!=='A'&&r.group!=='R'))return null;
   /* v71: 24 ש׳ במהלכים כירורגיה רק לרוטציה (לא ICU) ולמי שמסומן "מעדיף כפולה". באגף א מפצלים 12/12 */
-  if(r.group==='A'&&!rulesOf(pid).dbl)return null;if(isICU(pid))return null;
+  if(!allow24(pid))return null;
   if(!mcT.groups.includes(r.group)||!ncT.groups.includes(r.group)||!qualified(pid,mcT)||!qualified(pid,ncT))return null;
   const cl=cellOf(pid,d);if(cl.mk==='vac')return null;
   const a=iv('mc',d),b=iv('nc',d);if(blockHit(pid,a,d,mcT)||blockHit(pid,b,d,ncT))return null;
