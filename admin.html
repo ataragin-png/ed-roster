@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 77</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 78</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -314,6 +314,8 @@ if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfy
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
 /* v72: ביטול הדרישה הקודמת (חותם רק בבוקר אגף א): מספיק חותם בבוקר אגף א או בצד ב (בוקר+תורנות) */
 if(!S.v22){S.v22=1;const m=S.types.find(t=>t.code==='m');if(m&&m.sigReq){m.sigReq[5]=0;m.sigReq[6]=0}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* v78: מד״א גם לרוטציונרים (בוקר אחד לכל רוטציונר בפנימית) */
+if(!S.v23){S.v23=1;const a=S.types.find(t=>t.code==='a');if(a&&!a.groups.includes('R'))a.groups.push('R');try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v19){S.v19=1;const ab=S.people.find(p=>norm(p.name)==='אברהם');if(ab){ab.rules=ab.rules||{};if(ab.rules.dbl===undefined)ab.rules.dbl=true}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v18){S.v18=1;const as=S.people.find(p=>norm(p.name)==='אשר');if(as){as.rules=as.rules||{};if(as.rules.aS===undefined)as.rules.aS=10}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v17){S.v17=1;try{S.nameAliases=S.nameAliases||{};const dv=S.people.find(p=>norm(p.name)==='דוד');if(dv&&!S.nameAliases[nameKey('טרגין')])S.nameAliases[nameKey('טרגין')]=dv.id;
@@ -345,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 77';
+const BUILD='5.11.2026 גרסה 78';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -487,7 +489,7 @@ function wcMatch(wc,t){if(!wc)return true;if(wc==='@day')return isMorn(t)&&!isNi
 function rulesOf(pid){return(person(pid)||{}).rules||{}}
 function isFriLike(d){return wd(d)===5||dtype(d)==='eve'}
 function units(pid,t,d){const r=M().roster[pid];if(t.kind!=='shift'&&t.kind!=='duty')return null;
-  if(r&&r.group==='R'&&t.code==='z')return{shift:0,duty:0,day:1};
+  if(r&&r.group==='R'&&(t.code==='z'||t.code==='a'))return{shift:0,duty:0,day:1};
   const ru=rulesOf(pid);if(r&&r.group==='A'&&ru.friLong&&ru.friLong!=='one'&&t.kind==='shift'&&isMorn(t)&&!isNight(t)&&isFriLike(d))return ru.friLong==='two'?{shift:2,duty:0}:{shift:0,duty:1};
   return t.kind==='shift'?{shift:1,duty:0}:{shift:0,duty:1}}
 function addUnits(c,pid,t,d,sign){const u=units(pid,t,d);if(!u){c[t.kind]+=sign;return}c.shift+=sign*u.shift;c.duty+=sign*u.duty;c.day=(c.day||0)+sign*(u.day||0)}
