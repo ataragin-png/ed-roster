@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 71</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 72</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -312,6 +312,8 @@ if(!S.settings.req.deadlines)S.settings.req.deadlines={'2026-10':'2026-09-29T09:
 if(!Array.isArray(S.pending))S.pending=[];
 if(!S.settings.apiUrl)S.settings.apiUrl='https://script.google.com/macros/s/AKfycbxExDfD1t_dGu8UCFcNvCIx05IiXz4FqlD6j6hdKQiuTGe_6D4Y0XrDSecNeYzsQL63Fg/exec';
 for(const key in S.months){const mo=S.months[key];if(!mo.autoHol){const a=autoTypes(key);for(const d in a)if(!mo.dayTypes[d])mo.dayTypes[d]=a[d];mo.autoHol=1}}
+/* v72: ביטול הדרישה הקודמת (חותם רק בבוקר אגף א): מספיק חותם בבוקר אגף א או בצד ב (בוקר+תורנות) */
+if(!S.v22){S.v22=1;const m=S.types.find(t=>t.code==='m');if(m&&m.sigReq){m.sigReq[5]=0;m.sigReq[6]=0}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v19){S.v19=1;const ab=S.people.find(p=>norm(p.name)==='אברהם');if(ab){ab.rules=ab.rules||{};if(ab.rules.dbl===undefined)ab.rules.dbl=true}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v18){S.v18=1;const as=S.people.find(p=>norm(p.name)==='אשר');if(as){as.rules=as.rules||{};if(as.rules.aS===undefined)as.rules.aS=10}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.v17){S.v17=1;try{S.nameAliases=S.nameAliases||{};const dv=S.people.find(p=>norm(p.name)==='דוד');if(dv&&!S.nameAliases[nameKey('טרגין')])S.nameAliases[nameKey('טרגין')]=dv.id;
@@ -343,7 +345,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 71';
+const BUILD='4.11.2026 גרסה 72';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -420,6 +422,10 @@ function intWkMax(){const v=S.settings.intWkMax;return v===''||v===undefined||v=
 function sigWhy(d){const out=[];for(const p of rosterIds()){if(!person(p).signer)continue;const r=M().roster[p];const cs=cellOf(p,d).c.map(typeBy).filter(Boolean);
   if(r.group==='X'&&cs.length)out.push(`${pname(p)} רשום כלא זמין החודש`);else{const night=cs.filter(t=>isNight(t)&&!t.signer);if(night.length)out.push(`${pname(p)} ב${night[0].name}, שלא נחשבת לכיסוי חותם`)}}
   return out.length?'. '+out.join('; '):''}
+/* בוקר של סופ״ש או חג: צריך חותם בבוקר אגף א או בצד ב */
+const MORN_SIG=['m','bv'];
+function morningSigDay(d){const dt=dtype(d);return wd(d)===5||wd(d)===6||dt==='hol'||dt==='eve'}
+function morningSigners(d){return rosterIds().filter(p=>isSigner(p)&&cellOf(p,d).c.some(c=>MORN_SIG.includes(c)))}
 function sigDay(d){return S.types.some(t=>t.signer&&need(t.code,d))}
 function signersOn(d){return rosterIds().filter(p=>isSigner(p)&&cellOf(p,d).c.some(c=>typeBy(c)?.signer))}
 /* v70: הסמכה לפי רוטציה רק אחרי שסיים אותה (חודש קודם לחודש המשובץ), לא בזמן הרוטציה */
@@ -437,7 +443,7 @@ function courseDaysIn(key){return(courseCfg().dates||[]).filter(x=>x.slice(0,7)=
 function courseWins(pid){if(!inCourse(pid))return[];const[y,m]=ym();const nk=m===12?`${y+1}-01`:`${y}-${pad2(m+1)}`;const ds=[...courseDaysIn(S.cur),...courseDaysIn(nk).filter(d=>d===1).map(()=>dim()+1)];return ds.map(d=>({d,s:(d-2)*1440+1260,e:(d-1)*1440+1260}))}
 function courseHit(pid,x){const w=courseWins(pid).find(w=>x.s<w.e&&w.s<x.e);return w?(w.d>dim()?`1 בחודש הבא`:`${w.d}`):''}
 function cSigFrom(){const v=S.settings.cSigFrom;return v===undefined?'2026-12':String(v||'')}
-function sigReqOn(t,d){if(t.code==='c'&&cSigFrom()&&S.cur>=cSigFrom())return true;return!!(t.sigReq&&t.sigReq[wd(d)])}
+function sigReqOn(t,d){if(t.code==='c'&&cSigFrom()&&S.cur>=cSigFrom())return true;const dt=dtype(d),i=dt==='hol'?6:dt==='eve'?5:wd(d);return!!(t.sigReq&&t.sigReq[i])}
 function rotRe(pid,re){const r=M().roster[pid];return!!r&&r.group==='R'&&re.test(r.rot||'')}
 function isBG(pid){return rotRe(pid,/ב\s*\+\s*ג|צד\s*[בג]|אגף\s*ב/)}
 function isBS(pid){return rotRe(pid,/מדעי\s*ה?יסוד/)}
@@ -569,9 +575,10 @@ function analyze(){
       const msg=`שני אנשים ב${loc} באותו זמן: ${pname(a.pid)} ו${pname(b.pid)}`;add(a.pid,a.d,'err',msg);add(b.pid,b.d,'err',msg);clash.push(b.d)}}
   {const mx=intWkMax();if(mx!==null){let c=0;for(let d=1;d<=N;d++)if(isWeekend(d))for(const t of S.types)if(t.internal)for(const p of filled(t.code,d)){c++;if(c>mx)add(p,d,'warn',`יותר מ־${mx} תורנויות פנימית בסופ״ש`)}}}
   const noSig=[];for(let d=1;d<=N;d++)if(sigDay(d)&&!signersOn(d).length)noSig.push(d);
+  const noSigMorn=[];for(let d=1;d<=N;d++)if(morningSigDay(d)&&(filled('m',d).length||filled('bv',d).length)&&!morningSigners(d).length){noSigMorn.push(d);for(const p of [...filled('m',d),...filled('bv',d)])add(p,d,'err','בבוקר סופ״ש/חג אין חותם שחרור (לא בבוקר אגף א ולא בצד ב)')}
   const noWk=ids.filter(p=>wkNeed(p)&&per[p].cnt.wk.size===0&&per[p].list.length);
   let errs=0,warns=0;for(const k in issues)issues[k].lvl==='err'?errs++:warns++;
-  return{per,issues,missing,missList,errs,warns,noSig,clash,noWk};
+  return{per,issues,missing,missList,errs,warns,noSig,noSigMorn,clash,noWk};
 }
 
 /* ---------- evaluation (manual + auto) ---------- */
