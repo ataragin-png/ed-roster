@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 75</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 76</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -345,7 +345,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 75';
+const BUILD='4.11.2026 גרסה 76';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -579,7 +579,7 @@ function analyze(){
     for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length&&L[j].s<L[i].e;j++){const a=L[i],b=L[j];if(a.pid===b.pid)continue;
       const msg=`שני אנשים ב${loc} באותו זמן: ${pname(a.pid)} ו${pname(b.pid)}`;add(a.pid,a.d,'err',msg);add(b.pid,b.d,'err',msg);clash.push(b.d)}}
   {const mx=intWkMax();if(mx!==null){let c=0;for(let d=1;d<=N;d++)if(isWeekend(d))for(const t of S.types)if(t.internal)for(const p of filled(t.code,d)){c++;if(c>mx)add(p,d,'warn',`יותר מ־${mx} תורנויות פנימית בסופ״ש`)}}}
-  const noSig=[];for(let d=1;d<=N;d++)if(sigDay(d)&&!signersOn(d).length)noSig.push(d);
+  const noSig=[];for(let d=1;d<=N;d++)if(sigDay(d)&&!signersOn(d).length){noSig.push(d);for(const t of S.types)if(t.signer)for(const p of filled(t.code,d))add(p,d,'err','בלילה הזה אין חותם שחרור במלר״ד (לילה אגף א / תורנות צד ב / צד ג)')}
   const noSigMorn=[];for(let d=1;d<=N;d++)if(morningSigDay(d)&&(filled('m',d).length||filled('bv',d).length)&&!morningSigners(d).length){noSigMorn.push(d);for(const p of [...filled('m',d),...filled('bv',d)])add(p,d,'err','בבוקר סופ״ש/חג אין חותם שחרור (לא בבוקר אגף א ולא בצד ב)')}
   const noWk=ids.filter(p=>wkNeed(p)&&per[p].cnt.wk.size===0&&per[p].list.length);
   let errs=0,warns=0;for(const k in issues)issues[k].lvl==='err'?errs++:warns++;
