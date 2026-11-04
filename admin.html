@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 76</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 77</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -345,7 +345,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 76';
+const BUILD='4.11.2026 גרסה 77';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -543,7 +543,7 @@ function analyze(){
         else if(!groupOk(t,r.group))add(pid,d,'warn',`${t.name} לא מיועד ל${GROUPS[r.group]}`);
       }
       if(r.group==='A'&&cl.c.includes('mc')&&cl.c.includes('nc')){cnt.shift-=2;cnt.duty++}
-      if(r.group==='A'&&cl.c.includes('m')&&cl.c.includes('n')&&!rulesOf(pid).dbl)add(pid,d,'err','בוקר ולילה אגף א באותו יום (24 ש׳) רק למי שמסומן "מעדיף כפולה"');
+      if(r.group==='A'&&!rulesOf(pid).dbl){const ts=cl.c.map(typeBy).filter(t=>t&&t.kind==='shift');if(ts.some(t=>!isNight(t))&&ts.some(t=>isNight(t)))add(pid,d,'err','משמרת יום ומשמרת לילה באותו יום (24 ש׳) רק למי שמסומן "מעדיף כפולה"')}
       if(cl.c.includes('mc')&&cl.c.includes('nc')&&!allow24(pid))add(pid,d,'err','24 ש׳ במהלכים כירורגיה רק לרוטציה בפנימית, ב+ג או כירורגיה. לפצל 12/12')
       if(isICU(pid)&&(cl.c.includes('mc')||cl.c.includes('nc')))add(pid,d,'err','ברוטציית ICU לא חוזרים למהלכים כירורגיה')
       if(r.group==='R'){const sh=cl.c.filter(c=>c==='mc'||c==='nc').length;if(sh>=2){cnt.shift-=sh;cnt.duty++}else if(sh===1)add(pid,d,'warn','ברוטציה עושים במהלכים כירורגיה רק 24 שעות: בוקר וערב באותו יום')}
