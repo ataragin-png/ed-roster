@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 73</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 74</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -345,7 +345,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 73';
+const BUILD='4.11.2026 גרסה 74';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -557,6 +557,7 @@ function analyze(){
      if(r.group==='R'){let n=0;for(let d=1;d<=N;d++)if(is24cell(C(d))){n++;if(n>MAX24R)add(pid,d,'err',`ברוטציה עד ${MAX24R} תורנויות 24 שעות בחודש (כולל סופ״ש)`)}}
      if(isBS(pid))for(let d=1;d<=N;d++)if(is24cell(C(d))&&!isWeekend(d))add(pid,d,'err','מדעי היסוד: תורנות 24 שעות רק בסופ״ש');
      for(let d=-1;d<=N;d++)if(wd(d)===4&&dutyCell(C(d))&&dutyCell(C(d+2))){add(pid,d,'err','תורנות בחמישי ושוב בשבת באותו שבוע');add(pid,d+2,'err','תורנות בחמישי ושוב בשבת באותו שבוע')}}
+    {let on=0;const low=lowAvail(pid);for(const x of list){const t=typeBy(x.code);if(t&&t.kind==='duty'&&t.extra){on++;if(on>1)add(pid,x.d,'err','יותר מתורנות אחת בחוץ (טיפול נמרץ/אורטופדיה/ילדים) בחודש');if(low)add(pid,x.d,'err','זמין פחות מ־3/4 מהחודש: אין תורנות בחוץ (חוץ מיציאה לשלב א/ב)')}}}
     {const cc={};for(const x of list){const t=typeBy(x.code);cc[x.code]=(cc[x.code]||0)+1;if(t.noWeekend&&isWeekend(x.d))add(pid,x.d,'warn',`${t.name} לא משובץ בסופ״ש`);if(t.maxPer&&Number(t.maxPer)>0&&cc[x.code]>Number(t.maxPer))add(pid,x.d,'warn',`יותר מ־${t.maxPer} ${t.name} בחודש`)}}
     list.sort((a,b)=>a.s-b.s);all.sort((a,b)=>a.s-b.s);
     for(let i=1;i<all.length;i++){
@@ -640,6 +641,8 @@ function evaluate(pid,t,d,ctx){
   if(isNight(t)){const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2))){hard=true;why.push('שלושה לילות ברצף')}}
   if(sigReqOn(t,d)&&!isSigner(pid)){hard=true;why.push('ביום הזה נדרש חותם שחרור')}
   if((t.code==='mc'||t.code==='nc')&&isICU(pid)){hard=true;why.push('ברוטציית ICU לא חוזרים למהלכים כירורגיה')}
+  if(t.kind==='duty'&&t.extra&&lowAvail(pid)){hard=true;why.push('זמין פחות מ־3/4 מהחודש: בלי תורנות בחוץ')}
+  if(t.kind==='duty'&&t.extra&&ctx.iv[pid].some(y=>!y.x&&typeBy(y.c)?.extra&&typeBy(y.c)?.kind==='duty')){hard=true;why.push('כבר יש לו תורנות בחוץ החודש')}
   if(t.internal){if(isSigner(pid)){if(t.forSigners){score+=6;why.push('חותם, עדיף במהלכים')}else score-=6}else if(t.forSigners)score-=4}
   if(!qualified(pid,t)){hard=true;why.push(`לא מאושר ל${t.name}`)}
   if(t.signer&&isSigner(pid))why.push('חותם שחרור');
@@ -885,10 +888,28 @@ function renderGrid(){
     for(let d=1;d<=N;d++){const sg=signersOn(d),need_=sigDay(d);const cls='covbtn'+(sg.length?'':need_?' miss':' none');
       h+=`<td class="${dayClass(d)}"><span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center" title="${esc(fmtDate(d)+': '+(sg.length?sg.map(pname).join(', '):need_?'אין חותם שחרור בלילה'+sigWhy(d):'לא נדרש'))}">${esc(sg.length?sg.map(pname).join('+'):need_?'חסר':'·')}</span></td>`}
     h+=`</tr>`;
+    h+=`<tr class="cov"><td class="namecol" colspan="6"><span class="sig">ח</span> חותם בבוקר סופ״ש (בפנים/צד ב)</td>`;
+    for(let d=1;d<=N;d++){const need_=morningSigDay(d),sg=need_?morningSigners(d):[];const cls='covbtn'+(sg.length?'':need_?' miss':' none');
+      h+=`<td class="${dayClass(d)}"><span class="${cls}" style="display:inline-flex;align-items:center;justify-content:center" title="${esc(fmtDate(d)+': '+(sg.length?sg.map(pname).join(', '):need_?'אין חותם בבוקר':'לא נדרש'))}">${esc(sg.length?sg.map(pname).join(', ').slice(0,4):need_?'!':'')}</span></td>`}
+    h+=`</tr>`;
   }
   h+=`</tbody></table></div>`;
+  h+=dutySummaryPanel();
   $('#main').innerHTML=h;
 }
+/* v74: סיכום תורנויות לכל מתמחה: כמה והיכן. תורנות בחוץ (טנ״צ, אורטופדיה, ילדים) לכל היותר אחת בחודש */
+/* v74: מי שזמין פחות מ־3/4 מהחודש (חופש רצוף) לא מקבל תורנות בחוץ, חוץ מיציאה לבחינת שלב א/ב */
+function examLeave(pid){const r=M().roster[pid]||{};const pl=((S.rotPlan||{})[pid]||{})[S.cur]||'';return!!r.examLeave||/שלב\s*[אב]/.test(pl+' '+(r.rot||'')+' '+(r.notes||''))}
+function lowAvail(pid){return 1-quotaVacDays(pid)/dim()<0.75&&!examLeave(pid)}
+function dutyList(pid){const out=[];for(let d=1;d<=dim();d++){const c=cellOf(pid,d).c;if(c.includes('mc')&&c.includes('nc'))out.push({d,name:'24 ש׳ מהלכים כירורגיה',out:false});
+  for(const x of c){const t=typeBy(x);if(t&&t.kind==='duty')out.push({d,name:t.name,out:!!t.extra})}}return out}
+function dutySummaryPanel(){const ids=rosterIds().filter(p=>M().roster[p].group!=='X');const A=analyze();
+  const rows=ids.map(p=>{const L=dutyList(p),by={};for(const x of L){(by[x.name]=by[x.name]||{n:0,days:[],out:x.out}).n++;by[x.name].days.push(x.d)}
+    const outN=L.filter(x=>x.out).length;const a=A.per[p];
+    return`<tr${outN>1?' style="background:var(--danger-bg)"':''}><td><strong>${esc(pname(p))}</strong></td><td>${esc(M().roster[p].group==='A'?'אגף א':M().roster[p].rot||'רוטציה')}</td><td class="num">${a?a.cnt.duty+'/'+a.tgt.D:''}</td><td class="num"${outN>1?' style="color:var(--danger);font-weight:700"':''}>${outN}</td>
+    <td>${Object.entries(by).map(([n,v])=>`<span style="white-space:nowrap;${v.out?'color:var(--warn);font-weight:600':''}">${esc(n)} ×${v.n} (${v.days.join(', ')})</span>`).join(' · ')||'—'}</td></tr>`}).join('');
+  return`<div class="panel"><h2>תורנויות לפי מתמחה</h2><p class="hint">כמה תורנויות יש לכל מתמחה החודש והיכן. תורנות בחוץ (טיפול נמרץ, אורטופדיה, ילדים) מסומנת בכתום, ולכל היותר אחת בחודש.</p>
+  <div class="tablewrap"><table class="form"><thead><tr><th>שם</th><th>סבב</th><th>תורנויות</th><th>בחוץ</th><th>היכן (תאריכים)</th></tr></thead><tbody>${rows}</tbody></table></div></div>`}
 
 function planLabelToGroup(l){l=norm(l);if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return{g:'A',rot:'אגף א'};if(/מילואים|שלב\s*[אב]|לא\s*פעיל|חל.?ד|חופשת\s*לידה|סטאז|^חופש$/.test(l))return{g:'X',rot:l};return{g:'R',rot:l}}
 function monthBuilt(key){const mo=S.months[key];return!!mo&&Object.values(mo.cells||{}).some(c=>c&&c.c&&c.c.length)}
