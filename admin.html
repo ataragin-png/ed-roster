@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">3.11.2026 גרסה 66</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 67</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -343,7 +343,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='3.11.2026 גרסה 66';
+const BUILD='4.11.2026 גרסה 67';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -405,7 +405,7 @@ function hm(s){const[a,b]=(s||'0:0').split(':').map(Number);return a*60+(b||0)}
 function iv(code,d){const t=typeBy(code);if(!t)return null;const base=(d-1)*1440;let s=base+hm(t.start),e=base+hm(t.end);if(e<=s)e+=1440;return{s,e}}
 function isMorn(t){return hm(t.start)<720}
 function isNight(t){return hm(t.end)<=hm(t.start)}
-function availFrac(pid){return Math.max(0.15,1-vacDays(pid)/dim())}
+function availFrac(pid){return Math.max(0.15,1-quotaVacDays(pid)/dim())}
 function isSigner(pid){const p=person(pid);return!!(p&&p.signer)&&M().roster[pid]&&M().roster[pid].group!=='X'}
 function intWkMax(){const v=S.settings.intWkMax;return v===''||v===undefined||v===null||isNaN(v)?null:Number(v)}
 function sigWhy(d){const out=[];for(const p of rosterIds()){if(!person(p).signer)continue;const r=M().roster[p];const cs=cellOf(p,d).c.map(typeBy).filter(Boolean);
@@ -485,8 +485,15 @@ function rosterIds(){const R=M().roster;const go={A:0,R:1,X:2};return Object.key
 function need(code,d){const ov=M().needOv[code+'|'+d];if(ov!==undefined)return ov;const t=typeBy(code);if(!t)return 0;const dt=dtype(d);const idx=dt==='hol'?6:dt==='eve'?5:wd(d);return t.need[idx]?1:0}
 function filled(code,d){return rosterIds().filter(id=>cellOf(id,d).c.includes(code))}
 function vacDays(pid){let n=0;for(let d=1;d<=dim();d++)if(cellOf(pid,d).mk==='vac')n++;return n+(Number(M().roster[pid].extraVac)||0)}
+/* v67: ימי חופש מורידים מהמכסה רק ברצף של 5 ימים לפחות (כולל ימים צמודים בחודש הקודם או הבא) */
+const VAC_RUN_MIN=5;
+function quotaVacDays(pid){const N=dim(),pk=adjKey(S.cur,-1),nk=adjKey(S.cur,1),P=S.months[pk],X=S.months[nk];
+  const[py,pm]=pk.split('-').map(Number),pn=new Date(py,pm,0).getDate();
+  const isV=d=>{if(d>=1&&d<=N)return cellOf(pid,d).mk==='vac';if(d<1){const c=P&&P.cells&&P.cells[pid+'|'+(pn+d)];return!!c&&c.mk==='vac'}const c=X&&X.cells&&X.cells[pid+'|'+(d-N)];return!!c&&c.mk==='vac'};
+  let n=0;for(let d=1;d<=N;d++){if(!isV(d))continue;let a=d,b=d;while(isV(a-1)&&a>-40)a--;while(isV(b+1)&&b<N+40)b++;if(b-a+1>=VAC_RUN_MIN)n++}
+  return n+(Number(M().roster[pid].extraVac)||0)}
 function targets(pid){
-  const r=M().roster[pid], st=S.settings, frac=Math.max(0,1-vacDays(pid)/dim());
+  const r=M().roster[pid], st=S.settings, frac=Math.max(0,1-quotaVacDays(pid)/dim());
   let S_=0,D_=0;
   if(r.group==='A'){const as=rulesOf(pid).aS;S_=(as!==undefined&&as!==''&&!isNaN(as)?Number(as):st.baseAS)*frac;D_=st.baseAD*frac;if(inCourse(pid)&&courseDaysIn(S.cur).length)S_=Math.max(0,S_-1)}else if(r.group==='R'){const rd=rulesOf(pid).rotD;D_=(rd!==undefined&&rd!==''&&!isNaN(rd)?Number(rd):st.baseRD)*frac}
   if(r.tS!==null&&r.tS!==''&&!isNaN(r.tS))S_=Number(r.tS);
@@ -1026,7 +1033,7 @@ function renderLuach(){
 
 function renderSettings(){
   const st=S.settings;
-  let h=`<div class="panel"><h2>מכסות וכללי מנוחה</h2><p class="hint">מכסות בסיס לחודש מלא. בכל מתמחה המכסה מחושבת לפי (1 פחות ימי חופש חלקי ימי החודש), כמו במחשבון בקובץ.</p><div class="kv">
+  let h=`<div class="panel"><h2>מכסות וכללי מנוחה</h2><p class="hint">מכסות בסיס לחודש מלא. בכל מתמחה המכסה מחושבת לפי (1 פחות ימי חופש חלקי ימי החודש), כמו במחשבון בקובץ. נספרים רק ימי חופש ברצף של 5 ימים לפחות (גם כשהרצף נמשך מהחודש הקודם או לחודש הבא).</p><div class="kv">
   <label>משמרות אגף א<input type="number" data-s="baseAS" value="${st.baseAS}"></label>
   <label>תורנויות אגף א<input type="number" data-s="baseAD" value="${st.baseAD}"></label>
   <label>תורנויות בסבב<input type="number" data-s="baseRD" value="${st.baseRD}"></label>
