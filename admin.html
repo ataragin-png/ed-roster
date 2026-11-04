@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 68</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 69</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -343,7 +343,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 68';
+const BUILD='4.11.2026 גרסה 69';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -362,12 +362,20 @@ async function pushState(){
   if(!(S.settings.apiUrl&&S.settings.apiKey))return;
   if(!S.synced){loadFromServer();return}
   try{ensurePlanNames();const st={...S,settings:{...S.settings,apiKey:''}};
-    const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'saveState',key:S.settings.apiKey,ts:S.savedAt,state:JSON.stringify(st),tab:monthTab(S.cur)})});const j=await r.json();
+    const ts=S.savedAt;const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'saveState',key:S.settings.apiKey,ts,base:S.baseTs||0,state:JSON.stringify({...st,baseTs:ts}),tab:monthTab(S.cur)})});const j=await r.json();
+    if(!j.ok&&j.error==='stale'){staleReload();return}
+    if(j.ok){S.baseTs=ts;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
     if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם':j.error==='action'?'צריך לעדכן את הקוד בגיליון':String(j.error));
     setSync('נשמר בגיליון '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}));
     if(S.boardSync&&S.boardSync[S.cur])exportBoard(true,true);else if(autoBoardOk())exportBoard(false,true)}
   catch(e){setSync('השמירה בגיליון נכשלה: '+e.message)}
 }
+/* v69: הגנה מדריסה. כל שמירה נשלחת עם הגרסה שעליה היא מבוססת. אם בינתיים נשמרה בגיליון גרסה אחרת (ממכשיר אחר), השרת דוחה, והאתר טוען את הגרסה העדכנית */
+async function staleReload(){try{const r=await fetch(S.settings.apiUrl+'?action=state&key='+encodeURIComponent(S.settings.apiKey));const j=await r.json();if(!j.ok||!j.state)return;
+  const x=JSON.parse(j.state);x.synced=true;x.baseTs=Number(j.ts);x.settings=x.settings||{};x.settings.apiUrl=S.settings.apiUrl;x.settings.apiKey=S.settings.apiKey;x.lastTab=tab;x.cur=S.cur;
+  try{localStorage.setItem(KEY,JSON.stringify(x));sessionStorage.setItem('ed-stale','1')}catch(e){}location.reload()}catch(e){setSync('השמירה בגיליון נכשלה: יש גרסה חדשה יותר בגיליון. רעננו את הדף')}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.synced)loadFromServer()});
+setTimeout(()=>{try{if(sessionStorage.getItem('ed-stale')){sessionStorage.removeItem('ed-stale');toast('בזמן שהדף היה פתוח נשמרו שינויים ממקום אחר. נטענה הגרסה העדכנית, והשינוי האחרון שלך לא נשמר. בצעו אותו שוב.',8000)}}catch(e){}},800);
 async function loadFromServer(){
   if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;
   setSync('בודק בגיליון…');
@@ -379,9 +387,10 @@ async function loadFromServer(){
      if(miss.length){sx.synced=true;sx.settings=sx.settings||{};sx.settings.apiUrl=S.settings.apiUrl;sx.settings.apiKey=S.settings.apiKey;try{localStorage.setItem(KEY,JSON.stringify(sx))}catch(e){}location.reload();return}}
     if(!S.synced||Number(j.ts)>(S.savedAt||0)){
       if(!S.synced&&S.savedAt&&Number(j.ts)<S.savedAt&&!confirm(`בגיליון שמורים נתונים מ־${new Date(Number(j.ts)).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}. לטעון אותם? הנתונים שבמכשיר הזה יוחלפו.\n(ביטול ישמור את הנתונים שבמכשיר הזה בגיליון במקום)`)){markSynced();pushState();return}
-      const x=JSON.parse(j.state);x.synced=true;x.settings=x.settings||{};x.settings.apiUrl=S.settings.apiUrl;x.settings.apiKey=S.settings.apiKey;x.lastTab=tab;
+      const x=JSON.parse(j.state);x.synced=true;x.baseTs=Number(j.ts);x.settings=x.settings||{};x.settings.apiUrl=S.settings.apiUrl;x.settings.apiKey=S.settings.apiKey;x.lastTab=tab;
       try{localStorage.setItem(KEY,JSON.stringify(x))}catch(e){}location.reload();return}
     if(Number(j.ts)<(S.savedAt||0)){pushState();return}
+    if(!S.baseTs){S.baseTs=Number(j.ts);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
     setSync('מעודכן מול הגיליון')}
   catch(e){setSync('אין חיבור לגיליון')}
 }
