@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 67</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">4.11.2026 גרסה 68</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -343,7 +343,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='4.11.2026 גרסה 67';
+const BUILD='4.11.2026 גרסה 68';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -365,7 +365,7 @@ async function pushState(){
     const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'saveState',key:S.settings.apiKey,ts:S.savedAt,state:JSON.stringify(st),tab:monthTab(S.cur)})});const j=await r.json();
     if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם':j.error==='action'?'צריך לעדכן את הקוד בגיליון':String(j.error));
     setSync('נשמר בגיליון '+new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}));
-    if(S.boardSync&&S.boardSync[S.cur])exportBoard(true,true)}
+    if(S.boardSync&&S.boardSync[S.cur])exportBoard(true,true);else if(autoBoardOk())exportBoard(false,true)}
   catch(e){setSync('השמירה בגיליון נכשלה: '+e.message)}
 }
 async function loadFromServer(){
@@ -1655,6 +1655,9 @@ function boardTabName(){const[y,m]=ym();return`${ENG_M[m-1]} ${String(y).slice(2
 function boardSig(rows){const t=rows.map(r=>(r||[]).map(x=>norm(String(x??''))).join('\t').replace(/\t+$/,'')).join('\n').replace(/\n+$/,'');let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return String(h)}
 function boardId(){return((S.settings.boardUrl||'').match(/\/d\/([^/]+)/)||[])[1]}
 let boardBusy=false;
+/* v68: חודש שכבר שובץ (מהחודש הנוכחי והלאה) ועוד אין לו לשונית בלוח התורנויות: יוצרים אותה אוטומטית. לשונית קיימת לא נדרסת */
+function autoBoardOk(){const n=new Date(),now=`${n.getFullYear()}-${pad2(n.getMonth()+1)}`;if(S.cur<now||!boardId())return false;
+  let k=0;for(const key in M().cells)if((M().cells[key].c||[]).length)k++;return k>=20}
 async function exportBoard(overwrite,silent){
   const st=S.settings;if(!apiOn()){if(!silent)toast('צריך שרת ומפתח');return}
   const id=boardId();if(!id){if(!silent)toast('אין קישור ללוח התורנויות בלשונית משמרות וכללים',4000);return}
