@@ -900,7 +900,7 @@ function renderGrid(){
 /* v74: סיכום תורנויות לכל מתמחה: כמה והיכן. תורנות בחוץ (טנ״צ, אורטופדיה, ילדים) לכל היותר אחת בחודש */
 /* v74: מי שזמין פחות מ־3/4 מהחודש (חופש רצוף) לא מקבל תורנות בחוץ, חוץ מיציאה לבחינת שלב א/ב */
 function examLeave(pid){const r=M().roster[pid]||{};const pl=((S.rotPlan||{})[pid]||{})[S.cur]||'';return!!r.examLeave||/שלב\s*[אב]/.test(pl+' '+(r.rot||'')+' '+(r.notes||''))}
-function lowAvail(pid){return 1-quotaVacDays(pid)/dim()<0.75&&!examLeave(pid)}
+function lowAvail(pid){const r=M().roster[pid]||{};return 1-quotaVacDays(pid)/dim()<0.75&&!examLeave(pid)&&!r.outOk}
 function dutyList(pid){const out=[];for(let d=1;d<=dim();d++){const c=cellOf(pid,d).c;if(c.includes('mc')&&c.includes('nc'))out.push({d,name:'24 ש׳ מהלכים כירורגיה',out:false});
   for(const x of c){const t=typeBy(x);if(t&&t.kind==='duty')out.push({d,name:t.name,out:!!t.extra})}}return out}
 function dutySummaryPanel(){const ids=rosterIds().filter(p=>M().roster[p].group!=='X');const A=analyze();
