@@ -227,7 +227,7 @@ try{const u=new URLSearchParams(location.search).get('api');if(u&&/^https:\/\/sc
 async function sendQ(q,msg,okText){
   if(!API){showMsg(msg,okText);return}
   const sh=openSheet(`<h3>שולח…</h3><p class="sub">רגע אחד.</p>`);
-  try{const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'submit',q})});const j=await r.json();if(!j.ok){if(j.error==='closed'){sh.el.innerHTML=`<h3>ההגשה ננעלה</h3><p class="sub">המועד האחרון להגשת בקשות לחודש הזה עבר.</p><div class="foot"><button class="btn primary" data-close>סגור</button></div>`;return}throw new Error(j.error||'שגיאה')}
+  try{const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'submit',q,...(lateOk()?{key:adminKey()}:{})})});const j=await r.json();if(!j.ok){if(j.error==='closed'){sh.el.innerHTML=`<h3>ההגשה ננעלה</h3><p class="sub">המועד האחרון להגשת בקשות לחודש הזה עבר.</p><div class="foot"><button class="btn primary" data-close>סגור</button></div>`;return}throw new Error(j.error||'שגיאה')}
     sh.el.innerHTML=`<h3>נשלח ✓</h3><p class="sub">${esc(okText)}</p><div class="done">הבקשה הגיעה לרכז/ת השיבוץ. אם תשנו משהו, שלחו שוב, והבקשה האחרונה היא שתיקבע.</div><div class="foot"><button class="btn primary" data-close>סגור</button></div>`;
     try{localStorage.setItem('ed-last-sent',JSON.stringify({m:q.m,type:q.type||'req',ts:Date.now()}))}catch(e){}
   }catch(e){sh.el.innerHTML=`<h3>השליחה נכשלה</h3><p class="sub">בדקו את החיבור לאינטרנט ונסו שוב.</p><div class="foot"><button class="btn primary" data-close>סגור</button></div>`}
@@ -370,7 +370,11 @@ function persist(){try{localStorage.setItem(DKEY,JSON.stringify({...RQ,b:[...RQ.
 let PLAN=null;try{PLAN=JSON.parse(localStorage.getItem('ed-plan-v1')||'null')}catch(e){}
 let DEADLINES={'2026-10':'2026-09-29T09:00'};try{Object.assign(DEADLINES,JSON.parse(localStorage.getItem('ed-deadlines')||'{}'))}catch(e){}
 function dl(m){const v=DEADLINES[m];return v?new Date(v):null}
-function closed(m){const d=dl(m);return!!d&&Date.now()>d.getTime()}
+function closed(m){const d=dl(m);return!!d&&Date.now()>d.getTime()&&!lateOk()}
+/* חריג: אשר יכול להגיש גם אחרי הנעילה, רק מהמכשיר שבו מחובר אתר הניהול (המפתח נשמר בדפדפן) */
+const LATE_NAME='אשר';
+function adminKey(){try{return(JSON.parse(localStorage.getItem('ed-roster-v1')||'{}').settings||{}).apiKey||''}catch(e){return''}}
+function lateOk(){return typeof RQ!=='undefined'&&RQ&&norm(RQ.name)===LATE_NAME&&!!adminKey()}
 function dlText(m){const d=dl(m);return d?d.toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''}
 async function fetchPlan(){if(!API)return;try{const r=await fetch(API+'?action=plan');const j=await r.json();if(j.ok&&j.deadlines){DEADLINES={...DEADLINES,...j.deadlines};localStorage.setItem('ed-deadlines',JSON.stringify(DEADLINES))}if(j.ok&&j.plan){PLAN=j.plan;localStorage.setItem('ed-plan-v1',JSON.stringify(PLAN));const had=planFor(RQ.name,RQ.m);if(had)autoGroup();render()}}catch(e){}}
 function planRow(name){if(!PLAN)return null;const c=x=>norm(x).replace(/["'׳״`]/g,'');const n=c(name);if(!n)return null;const k=Object.keys(PLAN).find(x=>c(x)===n);return k?PLAN[k]:null}
