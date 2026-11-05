@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 79</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 80</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 79';
+const BUILD='5.11.2026 גרסה 80';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -471,8 +471,8 @@ const MAX24R=2;
 const PARTS={'':'כל היום',day:'יום (09–21)',night:'לילה (21–09)',duty:'תורנות (16–08)'};
 function blockWin(d,part){const b=(d-1)*1440;return part==='day'?{s:b+540,e:b+1260}:{s:b+1260,e:b+1980}}
 function blockHit(pid,x,d0,t){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='off')continue;
-  if(!cl.part){if(dd===d0&&!(t&&t.kind==='day'&&isBG(pid)&&/צד\s*[בג]/.test(t.loc||'')))return'יום שלם';continue}
-  if(cl.part==='duty'){if(dd===d0&&t&&t.kind==='duty')return`תורנות ב־${dd}`;continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
+  if(!cl.part){if(dd===d0&&!(t&&t.kind==='day'&&(isBG(pid)||homeOf(pid)==='b')&&/צד\s*[בג]/.test(t.loc||'')))return'יום שלם';continue}
+  if(cl.part==='duty'){if(dd===d0&&t&&t.kind==='duty')return`תורנות ב־${dd}`;continue}if(t&&t.kind==='day'&&(isBG(pid)||homeOf(pid)==='b')&&/צד\s*[בג]/.test(t.loc||''))continue;const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
 /* v64: "מעדיף שלא" באגף א יכול להיות רק ליום או רק ללילה (part), כמו בחסימה */
 function softHit(pid,t,d){if(!t)return false;const x=iv(t.code,d);for(const dd of [d-1,d,d+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='soft')continue;
   if(!cl.part){if(dd===d)return true;continue}const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return true}return false}
