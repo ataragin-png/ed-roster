@@ -263,7 +263,9 @@ const PART={'':'כל היום',day:'יום 09–21',night:'לילה 21–09',dut
 const SPART={'':'כל היום',day:'בוקר / יום 09–21',night:'לילה 21–09'};
 function softLabel(p){return p==='day'?'עדיף שלא יום':p==='night'?'עדיף שלא לילה':'עדיף שלא'}
 function units(){const u=[];for(const[d,p]of RQ.b){u.push(d);if(RQ.g==='A'&&!p)u.push(d)}return u}
-function blockLabel(p){return RQ.g==='A'&&p?(p==='day'?'חסום יום':p==='duty'?'חסום תורנות':'חסום לילה'):'חסום'}
+const RPART={'':'תורנות',morn:'בוקר',all:'תורנות + בוקר'};
+function homeB(){return RQ.g==='R'&&/ב\s*\+\s*ג|צד\s*[בג]|אגף\s*ב|כירורגיה/.test(RQ.rot||'')}
+function blockLabel(p){if(homeB())return p==='morn'?'חסום בוקר':p==='all'?'חסום הכל':'חסום תורנות';return RQ.g==='A'&&p?(p==='day'?'חסום יום':p==='duty'?'חסום תורנות':'חסום לילה'):'חסום'}
 function ruleModal(title,lines){openSheet(`<h3>${esc(title)}</h3><ul class="issues" style="padding-right:18px;margin-top:8px">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="foot"><button class="btn primary" data-close>הבנתי</button></div>`)}
 function rulesFor(g){return g==='R'?{max:RULES.R,wk:RULES.wkR}:{max:RULES.A,wk:RULES.wkA}}
 function checkBlocks(key,g,b){const ru=rulesFor(g),wk=b.filter(d=>kWeekend(key,d)).length,errs=[];
@@ -275,7 +277,7 @@ const DKEY='ed-request-draft-v1';
 function blank(){return{m:monthOpts()[1],name:'',g:'A',rot:'',b:[],s:[],w:[],vac:[],vby:'איתי',vre:'חופשה',t:'',mode:'b',wcode:''}}
 let RQ;try{RQ=JSON.parse(localStorage.getItem(DKEY)||'null')}catch(e){RQ=null}
 if(!RQ||!monthOpts().includes(RQ.m))RQ={...blank(),...(RQ?{name:RQ.name,g:RQ.g,rot:RQ.rot}:{})};
-RQ.b=new Map((RQ.b||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.bpart)RQ.bpart='';RQ.s=new Map((RQ.s||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.spart)RQ.spart='';RQ.w=new Map(RQ.w);RQ.vac=new Set(RQ.vac||[]);if(RQ.vby===undefined)RQ.vby='איתי';if(!RQ.vre)RQ.vre='חופשה';
+RQ.b=new Map((RQ.b||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.bpart)RQ.bpart='';if(!RQ.rbpart)RQ.rbpart='';RQ.s=new Map((RQ.s||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.spart)RQ.spart='';RQ.w=new Map(RQ.w);RQ.vac=new Set(RQ.vac||[]);if(RQ.vby===undefined)RQ.vby='איתי';if(!RQ.vre)RQ.vre='חופשה';
 let VIEW='req';try{VIEW=localStorage.getItem('ed-request-view')||'req'}catch(e){}
 const CH={m:monthOpts()[0],kind:'swap',d1:'',c1:'',w:'',d2:'',c2:'',agree:false,t:''};
 function setView(v){VIEW=v;try{localStorage.setItem('ed-request-view',v)}catch(e){}render()}
@@ -303,14 +305,15 @@ async function saveIcs(list){const txt=icsText(list),fname=`משמרות_${kLabe
   if(dl){try{await dl.save({filename:fname,data:new Blob([txt],{type:'text/calendar'})});toast('הקובץ נשמר')}catch(e){if(!(e&&e.code==='declined'))toast('השמירה לא הושלמה')}return}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));a.download=fname;document.body.appendChild(a);a.click();a.remove()}catch(e){toast('ההורדה לא זמינה בדפדפן הזה. השתמשו בכפתורי Google')}}
 let calFetched=false;
-async function fetchCal(manual){if(!API)return;try{const r=await fetch(API+'?action=calendar');const j=await r.json();if(j.ok&&j.cal){CAL=b64d(j.cal);localStorage.setItem('ed-cal-v1',JSON.stringify(CAL));if(VIEW==='cal'||VIEW==='swp')render();if(manual)toast('הלוח עודכן')}else if(manual)toast('עוד לא פורסם לוח')}catch(e){if(manual)toast('הטעינה נכשלה')}}
+let CALMONTHS=[],CALWANT='';
+async function fetchCal(manual){if(!API)return;try{const r=await fetch(API+'?action=calendar'+(CALWANT?'&m='+encodeURIComponent(CALWANT):''));const j=await r.json();if(j.ok&&Array.isArray(j.months))CALMONTHS=j.months;if(j.ok&&j.cal){CAL=b64d(j.cal);localStorage.setItem('ed-cal-v1',JSON.stringify(CAL));if(VIEW==='cal'||VIEW==='swp')render();if(manual)toast('הלוח עודכן')}else if(manual)toast('עוד לא פורסם לוח')}catch(e){if(manual)toast('הטעינה נכשלה')}}
 function renderCal(){
   if(API&&!calFetched){calFetched=true;fetchCal(false)}
   const names=CAL?Object.keys(CAL.a).sort((a,b)=>a.localeCompare(b,'he')):[];
   let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>הוספת המשמרות שלך ליומן</strong><ul>${API?'<li>הלוח המאושר נטען כאן אוטומטית.</li>':'<li>מדביקים כאן את הודעת הלוח שרכז/ת השיבוץ שלח/ה בקבוצה (עם השורה שמתחילה ב־#CAL).</li>'}<li>בוחרים את השם, ומוסיפים ליומן: כל המשמרות בקובץ אחד, או כל משמרת בנפרד ל־Google.</li><li>אחרי החלפה מאושרת תישלח הודעה חדשה. מדביקים אותה שוב ומעדכנים את היומן.</li></ul></div>
   ${API?`<div class="row" style="margin:0 0 12px"><button class="btn" id="calFetch">טען את הלוח העדכני</button></div>`:''}
   <textarea id="calPaste" ${API?'hidden':''} class="msgbox" style="min-height:70px" placeholder="הדביקו כאן את הודעת הלוח"></textarea>
-  <div class="row" style="margin:8px 0 14px">${API?'':'<button class="btn" id="calLoad">טען לוח</button>'}${CAL?`<span style="color:var(--muted);font-size:13px">נטען: ${kLabel(CAL.m)}, עודכן ${new Date(CAL.ts).toLocaleDateString('he-IL')}</span>`:''}</div>`;
+  <div class="row" style="margin:8px 0 14px">${API?'':'<button class="btn" id="calLoad">טען לוח</button>'}${CALMONTHS.length>1?`<label style="display:flex;align-items:center;gap:6px">חודש<select id="calMonth">${CALMONTHS.map(m=>`<option value="${m}" ${CAL&&CAL.m===m?'selected':''}>${esc(kLabel(m))}</option>`).join('')}</select></label>`:''}${CAL?`<span style="color:var(--muted);font-size:13px">נטען: ${kLabel(CAL.m)}, עודכן ${new Date(CAL.ts).toLocaleDateString('he-IL')}</span>`:''}</div>`;
   if(CAL){
     h+=`<div class="fields"><label>השם שלי<select id="calName"><option value="">בחרו</option>${names.map(n=>`<option ${norm(n)===norm(RQ.name)?'selected':''}>${esc(n)}</option>`).join('')}</select></label></div>`;
     const list=myShifts();
@@ -415,6 +418,7 @@ function render(){
     <button data-rqmode="v" aria-pressed="${RQ.mode==='v'}">חופשה / מילואים (${RQ.vac.size})</button></span>
     ${RQ.mode==='v'||RQ.vac.size?`<select id="rqVre" aria-label="סיבה" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px">${['חופשה','מילואים','קורס'].map(x=>`<option ${RQ.vre===x?'selected':''}>${x}</option>`).join('')}</select>${RQ.vre==='חופשה'?`<label style="font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px">מי אישר<input type="text" id="rqVby" value="${esc(RQ.vby)}" style="width:110px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px"></label>`:''}`:''}
     ${RQ.mode==='b'&&RQ.g==='A'?`<span class="seg" role="group" aria-label="מה לחסום">${Object.entries(PART).map(([k,v])=>`<button data-bpart="${k}" aria-pressed="${RQ.bpart===k}">${v}</button>`).join('')}</span>`:''}
+    ${RQ.mode==='b'&&homeB()?`<span class="seg" role="group" aria-label="מה לחסום">${Object.entries(RPART).map(([k,v])=>`<button data-rbpart="${k}" aria-pressed="${RQ.rbpart===k}">${v}</button>`).join('')}</span>`:''}
     ${RQ.mode==='s'&&RQ.g==='A'?`<span class="seg" role="group" aria-label="מתי מעדיף שלא">${Object.entries(SPART).map(([k,v])=>`<button data-spart="${k}" aria-pressed="${RQ.spart===k}">${v}</button>`).join('')}</span>`:''}
     ${RQ.mode==='w'?`<select id="rqWcode" aria-label="איזו משמרת" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px"><option value="">כל משמרת</option>${WANT[RQ.g].map(([c,n])=>`<option value="${c}" ${RQ.wcode===c?'selected':''}>${esc(n)}</option>`).join('')}</select>`:''}
   </div>
@@ -433,8 +437,8 @@ function render(){
 }
 function quota(){const f=Math.max(0,1-RQ.vac.size/kDim(RQ.m));return RQ.g==='A'?`מכסה משוערת: ${Math.round(BASE.AS*f)} משמרות ו־${Math.round(BASE.AD*f)} תורנויות`:`מכסה משוערת: ${Math.round(BASE.RD*f)} תורנויות`}
 function b64e(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))))}
-function buildReq(){return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),vac:[...RQ.vac].sort((a,b)=>a-b),vby:RQ.vre&&RQ.vre!=='חופשה'?RQ.vre:norm(RQ.vby),vre:RQ.vre||'חופשה',b:[...RQ.b.keys()].sort((a,b)=>a-b),bp:RQ.g==='A'?[...RQ.b].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],bu:units().sort((a,b)=>a-b),s:[...RQ.s.keys()].sort((a,b)=>a-b),sp:RQ.g==='A'?[...RQ.s].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
-function message(q){const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.bu.length}${q.g==='A'?' משמרות':''}): ${q.b.map(d=>{const p=(q.bp.find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':p==='duty'?'תורנות':'לילה'})`:String(d)}).join(', ')||'אין'}`];
+function buildReq(){return{v:1,m:RQ.m,n:norm(RQ.name),g:RQ.g,r:norm(RQ.rot),vac:[...RQ.vac].sort((a,b)=>a-b),vby:RQ.vre&&RQ.vre!=='חופשה'?RQ.vre:norm(RQ.vby),vre:RQ.vre||'חופשה',b:[...RQ.b.keys()].sort((a,b)=>a-b),bp:(RQ.g==='A'||homeB())?[...RQ.b].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],bu:units().sort((a,b)=>a-b),s:[...RQ.s.keys()].sort((a,b)=>a-b),sp:RQ.g==='A'?[...RQ.s].filter(([d,p])=>p).sort((a,b)=>a[0]-b[0]):[],w:[...RQ.w].sort((a,b)=>a[0]-b[0]),t:RQ.t.trim(),ts:Date.now()}}
+function message(q){const L=[`בקשות משמרות ל${kLabel(q.m)}`,`שם: ${q.n} (${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+q.r:'')})`,`חסימות (${q.bu.length}${q.g==='A'?' משמרות':''}): ${q.b.map(d=>{const p=(q.bp.find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':p==='duty'?'תורנות':p==='morn'?'בוקר':p==='all'?'תורנות + בוקר':'לילה'})`:String(d)}).join(', ')||'אין'}`];
   if(q.vac.length)L.push(q.vre&&q.vre!=='חופשה'?`${q.vre} (${q.vac.length} ימים): ${q.vac.join(', ')}`:`חופשה מאושרת (${q.vac.length} ימים, אישר: ${q.vby}): ${q.vac.join(', ')}`);
   if(q.s.length)L.push(`מעדיף שלא: ${q.s.map(d=>{const p=((q.sp||[]).find(x=>x[0]===d)||[])[1];return p?`${d} (${p==='day'?'יום':'לילה'})`:String(d)}).join(', ')}`);
   if(q.w.length)L.push(`רוצה לעבוד: ${q.w.map(([d,c])=>c?`${d} (${TNAME[c]||c})`:String(d)).join(', ')}`);
@@ -469,13 +473,14 @@ document.addEventListener('click',e=>{
     if(q.t)L.push('הערה: '+q.t);L.push('','#CHG:'+b64e(q));sendQ(q,L.join('\n'),'בקשת ההחלפה נשלחה. השינוי ייכנס ללוח רק אחרי אישור.');
     return}
   if(b.dataset.bpart!==undefined){RQ.bpart=b.dataset.bpart;persist();render();return}
+  if(b.dataset.rbpart!==undefined){RQ.rbpart=b.dataset.rbpart;persist();render();return}
   if(b.dataset.spart!==undefined){RQ.spart=b.dataset.spart;persist();render();return}
   if(b.dataset.rqg){RQ.g=b.dataset.rqg;RQ.wcode='';persist();render();return}
   if(b.dataset.rqmode){RQ.mode=b.dataset.rqmode;persist();render();return}
   if(b.dataset.rqday){const d=Number(b.dataset.rqday);
     if(RQ.mode==='v'){if(RQ.vac.has(d))RQ.vac.delete(d);else{RQ.vac.add(d);RQ.b.delete(d);RQ.s.delete(d);RQ.w.delete(d)}}
     else if(RQ.mode==='b'){
-      const part=RQ.g==='A'?RQ.bpart:'';
+      const part=RQ.g==='A'?RQ.bpart:homeB()?RQ.rbpart:'';
       if(RQ.b.has(d)&&RQ.b.get(d)===part){RQ.b.delete(d)}
       else{const ru=rulesFor(RQ.g),prev=RQ.b.has(d)?RQ.b.get(d):null;
         const old=RQ.b.get(d);RQ.b.set(d,part);const u=units(),wk=u.filter(x=>kWeekend(RQ.m,x)).length;
@@ -500,7 +505,7 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('input',e=>{const id=e.target.id;if(id==='chT'){CH.t=e.target.value;return}if(id==='rqNotes')RQ.t=e.target.value;else if(id==='rqRot')RQ.rot=e.target.value;else if(id==='rqName')RQ.name=e.target.value;else if(id==='rqVre'){RQ.vre=e.target.value;persist();render();return}else if(id==='rqVby')RQ.vby=e.target.value;else return;persist()});
-document.addEventListener('change',e=>{const id=e.target.id;
+document.addEventListener('change',e=>{const id=e.target.id;if(id==='calMonth'){CALWANT=e.target.value;fetchCal(true);return}
   if(id==='rqMonth'){RQ.m=e.target.value;RQ.b=new Map();RQ.s=new Map();RQ.w=new Map();RQ.vac=new Set();autoGroup();persist();render()}
   else if(id==='rqName'){RQ.name=e.target.value;if(planRow(RQ.name))autoGroup();persist();render()}
   else if(id==='chN'||id==='swN'){RQ.name=e.target.value;SWSEL='';persist();render()}

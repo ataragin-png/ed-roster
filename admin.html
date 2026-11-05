@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 80</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 81</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 80';
+const BUILD='5.11.2026 גרסה 81';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -468,9 +468,11 @@ function edgeList(pid){const out=[],N=dim(),pk=adjKey(S.cur,-1),nk=adjKey(S.cur,
   return out}
 function dLbl(d){const N=dim();if(d>=1&&d<=N)return String(d);const[y,m]=ym();if(d<1){const pn=new Date(y,m-1,0).getDate();return (pn+d)+'.'+(m===1?12:m-1)}return (d-N)+'.'+(m===12?1:m+1)}
 const MAX24R=2;
-const PARTS={'':'כל היום',day:'יום (09–21)',night:'לילה (21–09)',duty:'תורנות (16–08)'};
+const PARTS={'':'כל היום',day:'יום (09–21)',night:'לילה (21–09)',duty:'תורנות (16–08)',morn:'בוקר',all:'תורנות + בוקר'};
 function blockWin(d,part){const b=(d-1)*1440;return part==='day'?{s:b+540,e:b+1260}:{s:b+1260,e:b+1980}}
 function blockHit(pid,x,d0,t){for(const dd of [d0-1,d0,d0+1]){if(dd<1||dd>dim())continue;const cl=cellOf(pid,dd);if(cl.mk!=='off')continue;
+  if(cl.part==='all'){if(dd===d0)return'יום שלם';continue}
+  if(cl.part==='morn'){if(dd===d0&&t&&(t.kind==='day'||(t.kind==='shift'&&!isNight(t))))return`בוקר ב־${dd}`;continue}
   if(!cl.part){if(dd===d0&&!(t&&t.kind==='day'&&(isBG(pid)||homeOf(pid)==='b')&&/צד\s*[בג]/.test(t.loc||'')))return'יום שלם';continue}
   if(cl.part==='duty'){if(dd===d0&&t&&t.kind==='duty')return`תורנות ב־${dd}`;continue}if(t&&t.kind==='day'&&(isBG(pid)||homeOf(pid)==='b')&&/צד\s*[בג]/.test(t.loc||''))continue;const w=blockWin(dd,cl.part);if(x.s<w.e&&w.s<x.e)return`${cl.part==='day'?'יום':'לילה'} ב־${dd}`}return''}
 /* v64: "מעדיף שלא" באגף א יכול להיות רק ליום או רק ללילה (part), כמו בחסימה */
@@ -1582,7 +1584,7 @@ function applyRequest(q){
   for(let d=1;d<=N;d++){const k=p.id+'|'+d,cl=mo.cells[k];if(cl&&clr.includes(cl.mk)){cl.mk='';delete cl.wc;if(!cl.c.length)delete mo.cells[k]}}
   const put=(d,mk,wc,part)=>{d=Number(d);if(!(d>=1&&d<=N))return;const k=p.id+'|'+d,cl=mo.cells[k]||{c:[],mk:''};cl.mk=mk;if(wc)cl.wc=wc;else delete cl.wc;if(part)cl.part=part;else delete cl.part;mo.cells[k]=cl};
   const bpm=new Map(q.bp||[]);
-  (q.vac||[]).forEach(d=>put(d,'vac'));(q.b||[]).forEach(d=>put(d,'off','',q.g==='A'?bpm.get(d):''));const spm=new Map(q.sp||[]);(q.s||[]).forEach(d=>put(d,'soft','',q.g==='A'?spm.get(d):''));(q.w||[]).forEach(([d,c])=>put(d,'want',c));
+  (q.vac||[]).forEach(d=>put(d,'vac'));(q.b||[]).forEach(d=>put(d,'off','',bpm.get(d)||''));const spm=new Map(q.sp||[]);(q.s||[]).forEach(d=>put(d,'soft','',q.g==='A'?spm.get(d):''));(q.w||[]).forEach(([d,c])=>put(d,'want',c));
   return{p,isNew,mismatch:(r.group==='A'||r.group==='R')&&r.group!==q.g};
 }
 function sendSheet(){
@@ -1603,7 +1605,7 @@ function renderInbox(){
   let sub=0;
   const rows=ids.map(pid=>{
     const r=M().roster[pid]; const b=[],s=[],w=[];
-    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);if(cl.mk==='off')b.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='soft')s.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='want')w.push(d)}
+    for(let d=1;d<=N;d++){const cl=cellOf(pid,d);if(cl.mk==='off')b.push(d+(cl.part?' ('+({day:'יום',night:'לילה',duty:'תורנות',morn:'בוקר',all:'תורנות + בוקר'}[cl.part]||cl.part)+')':''));else if(cl.mk==='soft')s.push(d+(cl.part?(cl.part==='day'?' (יום)':' (לילה)'):''));else if(cl.mk==='want')w.push(d)}
     const chk=checkBlocks(S.cur,r.group==='R'?'R':'A',blockUnits(pid,r.group==='R'?'R':'A')); if(r.reqAt)sub++;
     return{pid,r,b,s,w,chk};
   });
@@ -1815,7 +1817,7 @@ function pendingCard(q,i){
   if(r&&r.reqAt)notes.push('יחליף בקשה קודמת');
   return`<div class="panel" style="margin-bottom:10px;padding:12px 14px"><div class="row" style="justify-content:space-between"><div><strong style="font-size:15px">${esc(q.n)}</strong> <span style="color:var(--muted);font-size:13px">בקשות ל${kLabel(q.m)}, ${q.g==='A'?'אגף א':'רוטציה'+(q.r?' '+esc(q.r):'')}, נשלח ${q.ts?new Date(q.ts).toLocaleDateString('he-IL'):''}</span></div>
   <div class="row"><button class="btn small primary" data-approve="${i}">אשר</button><button class="btn small danger" data-reject="${i}">דחה</button></div></div>
-  <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p[1]==='day'?'יום':p[1]==='duty'?'תורנות':'לילה'):''})`}).join(', '))||'אין'}</div>
+  <div style="font-size:13.5px;margin-top:6px;line-height:1.7"><div><b>חסימות ${(q.bu||q.b).length}/${chk.ru.max}</b> (בסופ״ש ${chk.wk}/${chk.ru.wk}): ${esc(q.b.map(d=>{const p=(q.bp||[]).find(x=>x[0]===d);return`${d} (${WD[kWd(q.m,d)]}${p?', '+(({day:'יום',duty:'תורנות',night:'לילה',morn:'בוקר',all:'תורנות + בוקר'}[p[1]]||p[1])):''})`}).join(', '))||'אין'}</div>
   ${q.vac&&q.vac.length?`<div><b>${q.vre&&q.vre!=='חופשה'?esc(q.vre):`חופשה מאושרת (אישר: ${esc(q.vby||'לא צוין')})`}:</b> ${esc(dl(q.vac))}</div>`:''}
   ${q.s.length?`<div><b>מעדיף שלא:</b> ${esc(q.s.map(d=>{const p=((q.sp||[]).find(x=>x[0]===d)||[])[1];return`${d} (${WD[kWd(q.m,d)]}${p?', '+(p==='day'?'יום':'לילה'):''})`}).join(', '))}</div>`:''}
   ${q.w.length?`<div><b>רוצה לעבוד:</b> ${esc(q.w.map(([d,c])=>c?`${d} (${typeBy(c)?.name||c})`:String(d)).join(', '))}</div>`:''}
