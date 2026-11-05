@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 78</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 79</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 78';
+const BUILD='5.11.2026 גרסה 79';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -695,13 +695,24 @@ function can24(pid,d,ctx,mcT,ncT,ignorePid){
   if(softHit(pid,typeBy('mc'),d)||softHit(pid,typeBy('nc'),d))sc-=8;if(cl.mk==='want'&&(!cl.wc||cl.wc==='@duty'||cl.wc==='mc'||cl.wc==='nc'))sc+=6;
   if(r.group==='A')sc-=1;return sc}
 /* v70: בקרים של צד ב+ג. מתמחי רוטציה שהבית שלהם צד ב (ב+ג, צד ב, כירורגיה) ממלאים בימי חול את בוקר צד ב, ואת בוקר צד ג כשהוא פנוי */
-function fillHomeMornings(){const N=dim(),ids=rosterIds(),home=ids.filter(p=>homeOf(p)==='b');if(!home.length)return 0;let n=0;const bT=typeBy('b'),gT=typeBy('g');if(!bT||!gT)return 0;
+function fillHomeMornings(){analyzeErrsBase=analyze().errs;const N=dim(),ids=rosterIds(),home=ids.filter(p=>homeOf(p)==='b');if(!home.length)return 0;let n=0;const bT=typeBy('b'),gT=typeBy('g');if(!bT||!gT)return 0;
   const cnt=p=>{let k=0;for(let d=1;d<=N;d++)if(cellOf(p,d).c.some(c=>c==='b'||c==='g'))k++;return k};
-  const pick=(t,d)=>{const ctx=buildCtx();let top=null,ts=-1e9;for(const p of home){const e=evaluate(p,t,d,ctx);if(e.hard)continue;const sc=-3*cnt(p)+e.score*0.1;if(sc>ts){ts=sc;top=p}}return top};
+  const cntB=p=>{let k=0;for(let d=1;d<=N;d++)if(cellOf(p,d).c.includes('b'))k++;return k};
+  const pick=(t,d)=>{const ctx=buildCtx();let top=null,ts=-1e9;for(const p of home){const e=evaluate(p,t,d,ctx);if(e.hard)continue;const sc=(t.code==='b'?-3*cntB(p)-cnt(p):-3*cnt(p))+e.score*0.1;if(sc>ts){ts=sc;top=p}}return top};
   for(let d=1;d<=N;d++){if(!need('b',d))continue;
     {const h=filled('b',d)[0];if(h&&!home.includes(h)){const x=cellOf(h,d);setCell(h,d,{c:x.c.filter(c=>c!=='b'),mk:x.mk});const p=pick(bT,d);if(p){const y=cellOf(p,d);setCell(p,d,{c:[...y.c,'b'],mk:y.mk});n++}else setCell(h,d,x)}}
     if(!filled('g',d).length){const p=pick(gT,d);if(p){const y=cellOf(p,d);setCell(p,d,{c:[...y.c,'g'],mk:y.mk});n++}}}
+  /* v79: שוויון בבקרי צד ב בין מתמחי ב+ג/כירורגיה: מי שיש לו הרבה בקרי ב עובר לבוקר ג, ומי שיש לו מעט מקבל את בוקר ב */
+  const bc=p=>{let k=0;for(let d=1;d<=N;d++)if(cellOf(p,d).c.includes('b'))k++;return k};
+  for(let it=0;it<40;it++){let moved=false;
+    for(let d=1;d<=N&&!moved;d++){if(!need('b',d))continue;const h=filled('b',d)[0];if(!h||!home.includes(h))continue;
+      for(const q of home){if(q===h||bc(h)-bc(q)<2)continue;const qc=cellOf(q,d);if(qc.c.length&&!(qc.c.length===1&&qc.c[0]==='g'))continue;
+        const snap=JSON.stringify(M().cells);const hc=cellOf(h,d);setCell(h,d,{c:hc.c.filter(c=>c!=='b'),mk:hc.mk});const q0=cellOf(q,d);const hadG=q0.c.includes('g');setCell(q,d,{c:q0.c.filter(c=>c!=='g').concat('b'),mk:q0.mk});
+        if(!filled('g',d).length){const h2=cellOf(h,d);setCell(h,d,{c:[...h2.c,'g'],mk:h2.mk})}
+        const A=analyze();if(A.errs===0||A.errs<=analyzeErrsBase){moved=true;n++;break}M().cells=JSON.parse(snap)}}
+    if(!moved)break}
   return n}
+let analyzeErrsBase=0;
 function autofill(){
   const N=dim(), ids=rosterIds(), sigs=new Set(ids.filter(isSigner));
   const slots=[];
