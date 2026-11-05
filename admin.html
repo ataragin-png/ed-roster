@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 81</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 82</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 81';
+const BUILD='5.11.2026 גרסה 82';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -419,6 +419,7 @@ function iv(code,d){const t=typeBy(code);if(!t)return null;const base=(d-1)*1440
 function isMorn(t){return hm(t.start)<720}
 function isNight(t){return hm(t.end)<=hm(t.start)}
 function availFrac(pid){return Math.max(0.15,1-quotaVacDays(pid)/dim())}
+function sigExOk(pid,d,code){const x=(M().sigEx||{})[pid+'|'+d];return !!x&&(x===true||x===code)}
 function isSigner(pid){const p=person(pid);return!!(p&&p.signer)&&M().roster[pid]&&M().roster[pid].group!=='X'}
 function intWkMax(){const v=S.settings.intWkMax;return v===''||v===undefined||v===null||isNaN(v)?null:Number(v)}
 function sigWhy(d){const out=[];for(const p of rosterIds()){if(!person(p).signer)continue;const r=M().roster[p];const cs=cellOf(p,d).c.map(typeBy).filter(Boolean);
@@ -538,7 +539,7 @@ function analyze(){
         const t=typeBy(code); if(!t){add(pid,d,'warn',`קוד לא מוכר: ${code}`);continue}
         const x=iv(code,d); list.push({d,code,...x}); addUnits(cnt,pid,t,d,1);if(shabbatHit(pid,x))add(pid,d,'err','לפי הכללים האישיים לא עובד בשבת (מליל שישי 21:00 עד מוצ״ש 21:00)'); if(code==='n')cnt.n++; if(isMornT(pid,t))cnt.mo++; if(isNightT(pid,t))cnt.ni++;
         if(isWeekend(d))cnt.wk.add(d);
-        if(sigReqOn(t,d)&&!isSigner(pid))add(pid,d,'err',`ב${t.name} ביום ${WD_LONG[wd(d)]} נדרש חותם שחרור`);
+        if(sigReqOn(t,d)&&!isSigner(pid)){if(sigExOk(pid,d,t.code))add(pid,d,'warn',`ב${t.name} ביום ${WD_LONG[wd(d)]} בלי חותם שחרור (חריגה מאושרת)`);else add(pid,d,'err',`ב${t.name} ביום ${WD_LONG[wd(d)]} נדרש חותם שחרור`)}
         {const ch=courseHit(pid,x);if(ch)add(pid,d,'err',`קורס ארצי ב־${ch}: אין לילה או תורנות בלילה שלפני, ואין משמרת ביום הקורס`)}
         if(!qualified(pid,t))add(pid,d,'err',`לא מאושר ל${t.name}`);
         if((rulesOf(pid).noCodes||[]).includes(code))add(pid,d,'err',`לפי כלל אישי לא משובץ ב${t.name}`);
@@ -644,7 +645,7 @@ function evaluate(pid,t,d,ctx){
     const tDuty=t.kind==='duty'||(t.code==='nc'&&L.some(z=>z.d===d&&z.c==='mc'));
     if(tDuty?(pureNightOn(d-1)||pureNightOn(d+1)):(dutyOn(d-1)||dutyOn(d+1))){hard=true;why.push('תורנות ולילה בימים רצופים')}}
   if(isNight(t)){const nd=new Set(ctx.iv[pid].filter(y=>y.ni).map(y=>y.d));if((nd.has(d-1)&&nd.has(d-2))||(nd.has(d-1)&&nd.has(d+1))||(nd.has(d+1)&&nd.has(d+2))){hard=true;why.push('שלושה לילות ברצף')}}
-  if(sigReqOn(t,d)&&!isSigner(pid)){hard=true;why.push('ביום הזה נדרש חותם שחרור')}
+  if(sigReqOn(t,d)&&!isSigner(pid)&&!sigExOk(pid,d,t.code)){hard=true;why.push('ביום הזה נדרש חותם שחרור')}
   if((t.code==='mc'||t.code==='nc')&&isICU(pid)){hard=true;why.push('ברוטציית ICU לא חוזרים למהלכים כירורגיה')}
   if(t.kind==='duty'&&t.extra&&lowAvail(pid)){hard=true;why.push('זמין פחות מ־3/4 מהחודש: בלי תורנות בחוץ')}
   if(t.kind==='duty'&&t.extra&&ctx.iv[pid].some(y=>!y.x&&typeBy(y.c)?.extra&&typeBy(y.c)?.kind==='duty')){hard=true;why.push('כבר יש לו תורנות בחוץ החודש')}
