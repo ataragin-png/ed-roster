@@ -336,7 +336,7 @@ function renderSwp(){
   if(API&&!calFetched){calFetched=true;fetchCal(false)}
   let h=viewTabs()+`<div class="panel req"><div class="rules"><strong>עם מי אפשר להתחלף</strong><ul><li>בוחרים משמרת שלך, ורואים את כל המתמחים שאפשר להתחלף איתם לפי כללי השיבוץ: חסימות, מנוחה, לילות ברצף, תורנות צמודה ללילה, סופ״ש, הסמכות ועוד.</li><li>הרשימה מחושבת בזמן פרסום הלוח. החלפות שאושרו אחרי הפרסום ייכנסו בפרסום הבא.</li><li>קודם מסכמים עם המתמחה השני. לחיצה על "מלא בקשה" ממלאת את טופס ההחלפה, ושולחים משם.</li></ul></div>
   <div class="fields"><label>השם שלי${nameSel('swN',RQ.name,'בחרו את השם שלכם')}</label></div>`;
-  if(API)h+=`<div class="row" style="margin:0 0 12px"><button class="btn" id="calFetch">טען את הלוח העדכני</button>${CAL?`<span style="color:var(--muted);font-size:13px">${kLabel(CAL.m)}, פורסם ${new Date(CAL.swTs||CAL.ts).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}</div>`;
+  if(API)h+=`<div class="row" style="margin:0 0 12px"><button class="btn" id="calFetch">טען את הלוח העדכני</button>${CALMONTHS.length>1?`<label style="display:flex;align-items:center;gap:6px">חודש<select id="calMonth">${CALMONTHS.map(m=>`<option value="${m}" ${CAL&&CAL.m===m?'selected':''}>${esc(kLabel(m))}</option>`).join('')}</select></label>`:''}${CAL?`<span style="color:var(--muted);font-size:13px">${kLabel(CAL.m)}, פורסם ${new Date(CAL.swTs||CAL.ts).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}</div>`;
   if(!CAL)h+=`<p class="hint">עוד לא פורסם לוח.</p>`;
   else if(!CAL.sw)h+=`<p class="hint">הלוח הנוכחי פורסם בלי רשימת החלפות. היא תופיע אחרי הפרסום הבא של רכז/ת השיבוץ.</p>`;
   else if(!norm(RQ.name))h+=`<p class="hint">בחרו את השם שלכם כדי לראות את המשמרות.</p>`;
