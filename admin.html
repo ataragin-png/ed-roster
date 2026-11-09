@@ -1186,13 +1186,16 @@ function swapOptions(P,d,code,lim){
   const c1=slotCodes(P,d,code),k1=slotKind(P,c1);
   const take=(p,dd,cs)=>{const cl=cellOf(p,dd);setCell(p,dd,{c:cl.c.filter(x=>!cs.includes(x)),mk:cl.mk})};
   const give=(p,dd,cs)=>{const cl=cellOf(p,dd);setCell(p,dd,{c:[...cl.c,...cs],mk:cl.mk})};
+  /* חותם שחרור: לילה שהיה מכוסה לפני ההחלפה חייב להישאר מכוסה אחריה */
+  const cov=dd=>!sigDay(dd)||signersOn(dd).length>0,covB=[];for(let dd=1;dd<=N;dd++)covB[dd]=cov(dd);
+  const sigOk=(Q,d2,c2s)=>{give(Q,d,c1);give(P,d2,c2s);try{return(!covB[d]||cov(d))&&(!covB[d2]||cov(d2))}finally{take(Q,d,c1);take(P,d2,c2s)}};
   take(P,d,c1);
   try{for(const Q of rosterIds()){if(Q===P||M().roster[Q].group==='X')continue;
     if(cellOf(Q,d).c.length||cellOf(Q,d).mk==='vac')continue;
     if(c1.length===1&&!groupOk(t1,M().roster[Q].group))continue;
     for(let d2=1;d2<=N;d2++){if(d2===d||cellOf(P,d2).c.length||cellOf(P,d2).mk==='vac')continue;const qc=cellOf(Q,d2).c;
       for(const c2 of [...qc]){const c2s=slotCodes(Q,d2,c2);if(c2s.length>1&&c2!=='mc')continue;if(!typeBy(c2))continue;if(slotKind(Q,c2s)!==k1)continue;
-        take(Q,d2,c2s);try{const ctx=buildCtx();const e1=evalSlot(Q,c1,d,ctx);if(!e1.hard){commitSlot(ctx,Q,c1,d);const e2=evalSlot(P,c2s,d2,ctx);if(!e2.hard)out.push({Q,d2,c2,c2s,score:e1.score+e2.score,why:[...e1.why,...e2.why]})}}finally{give(Q,d2,c2s)}}}}}
+        take(Q,d2,c2s);try{const ctx=buildCtx();const e1=evalSlot(Q,c1,d,ctx);if(!e1.hard){commitSlot(ctx,Q,c1,d);const e2=evalSlot(P,c2s,d2,ctx);if(!e2.hard&&sigOk(Q,d2,c2s))out.push({Q,d2,c2,c2s,score:e1.score+e2.score,why:[...e1.why,...e2.why]})}}finally{give(Q,d2,c2s)}}}}}
   finally{give(P,d,c1)}
   return out.sort((a,b)=>b.score-a.score).slice(0,lim||15);
 }
@@ -1208,7 +1211,7 @@ function autoFix(P,d,mode){pushUndo();const done=[],fail=[];
   return done.length?'בוצע: '+done.join('; ')+(fail.length?`. לא הסתדר: ${fail.join(', ')}`:''):'לא נמצאה החלפה שעומדת בכל הכללים. אפשר לנסות ידנית דרך "החלפה".'}
 function swapSheet(P,d,code){
   const t={name:slotName(slotCodes(P,d,code))};const opts=swapOptions(P,d,code);
-  const h=`<h3>החלפה: ${esc(pname(P))}, ${esc(t.name)} ב־${fmtDate(d)}</h3><p class="sub">בכל אפשרות: המתמחה השני לוקח את המשמרת הזו, ו${esc(pname(P))} לוקחת ממנו משמרת מאותו סוג ביום אחר. כל הכללים נבדקו (חסימות, מנוחה, לילות ברצף, מקומות ועוד). האפשרויות הטובות ביותר למעלה.</p>
+  const h=`<h3>החלפה: ${esc(pname(P))}, ${esc(t.name)} ב־${fmtDate(d)}</h3><p class="sub">בכל אפשרות: המתמחה השני לוקח את המשמרת הזו, ו${esc(pname(P))} לוקחת ממנו משמרת מאותו סוג ביום אחר. כל הכללים נבדקו (חסימות, מנוחה, לילות ברצף, מקומות, חותם שחרור בלילה ועוד). האפשרויות הטובות ביותר למעלה.</p>
   ${opts.length?`<div class="cands">${opts.map((o,i)=>`<div class="cand"><span class="why" style="color:var(--ink)"><b>${esc(pname(o.Q))}</b> לוקח/ת את ${fmtDate(d)}, ו${esc(pname(P))} עובדת במקומו ב<b>${fmtDate(o.d2)}</b> (${esc(slotName(o.c2s))})</span><button class="btn small primary" data-doswap="${i}">בצע</button></div>`).join('')}</div>`:`<p class="sub" style="color:var(--warn);font-weight:600">לא נמצאה החלפה שעומדת בכל הכללים. אפשר להוציא את המשמרת ולמלא את החור ידנית מרשימת המועמדים.</p>`}
   <div class="foot"><button class="btn" data-close>סגור</button></div>`;
   const sh=openSheet(h,()=>render());
