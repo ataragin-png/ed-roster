@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 82</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 83</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 82';
+const BUILD='5.11.2026 גרסה 83';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -960,6 +960,8 @@ function mergePeople(keepId,dropId){if(keepId===dropId)return;
 function autoDedupe(){let n=0;const g={};for(const p of S.people){const k=nameKey(p.name);if(!k)continue;(g[k]=g[k]||[]).push(p)}
   for(const k in g){const L=g[k];if(L.length<2)continue;L.sort((a,b)=>personData(b.id)-personData(a.id));for(const p of L.slice(1)){mergePeople(L[0].id,p.id);n++}}
   for(const p of S.people){const al=(S.nameAliases||{})[nameKey(p.name)];if(al&&al!==p.id&&person(al)){mergePeople(al,p.id);n++}}
+  /* v83: אותו מייל = אותו אדם */
+  const byMail={};for(const p of [...S.people]){const e=String(p.email||'').trim().toLowerCase();if(!e)continue;if(byMail[e]&&person(byMail[e])&&byMail[e]!==p.id){const keep=personData(byMail[e])>=personData(p.id)?byMail[e]:p.id,drop=keep===p.id?byMail[e]:p.id;mergePeople(keep,drop);byMail[e]=keep;n++}else byMail[e]=p.id}
   if(n){save();render();toast(`אוחדו אוטומטית ${n} שמות כפולים`,4000)}return n}
 function dupSheet(){
   const groups=findDups();const opt=()=>[...S.people].sort((a,b)=>a.name.localeCompare(b.name,'he')).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
