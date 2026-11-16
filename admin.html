@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 84</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 85</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 84';
+const BUILD='5.11.2026 גרסה 85';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -1183,6 +1183,9 @@ function slotKind(pid,codes){if(codes.length>1)return'duty';const t=typeBy(codes
 function slotName(codes){return codes.length>1?'24 שעות כירורגיה (בוקר+ערב)':(typeBy(codes[0])?.name||codes[0])}
 function evalSlot(X,codes,d,ctx){if(codes.length>1){if(M().roster[X].group==='X')return{hard:true,why:[],score:0};const sc=can24(X,d,ctx,typeBy('mc'),typeBy('nc'));return sc===null?{hard:true,why:['לא יכול 24 שעות כירורגיה'],score:0}:{hard:false,why:['24 שעות כירורגיה'],score:sc}}return evaluate(X,typeBy(codes[0]),d,ctx)}
 function commitSlot(ctx,X,codes,d){for(const c of codes)commit(ctx,X,typeBy(c),d);if(codes.length>1){ctx.cnt[X].shift-=2;ctx.cnt[X].duty++}}
+/* v85: טווח השעות של משבצת (דקות מתחילת היום), וחפיפה בין שתי משבצות באותו יום */
+function slotSpan(cs){let s=1e9,e=-1;for(const c of cs){const t=typeBy(c);if(!t)continue;const a=hm(t.start);let b=hm(t.end);if(b<=a)b+=1440;s=Math.min(s,a);e=Math.max(e,b)}return[s,e]}
+function spanOverlap(c1,c2){const[a1,b1]=slotSpan(c1),[a2,b2]=slotSpan(c2);return Math.min(b1,b2)-Math.max(a1,a2)>0}
 function swapOptions(P,d,code,lim){
   const t1=typeBy(code),N=dim(),out=[];if(!t1||!cellOf(P,d).c.includes(code))return out;
   const c1=slotCodes(P,d,code),k1=slotKind(P,c1);
@@ -1199,6 +1202,7 @@ function swapOptions(P,d,code,lim){
     if(cellOf(Q,d).c.length){const qd=[...cellOf(Q,d).c];const seen=new Set();
       for(const c2 of qd){if(seen.has(c2)||c1.includes(c2)||!typeBy(c2))continue;const c2s=slotCodes(Q,d,c2);c2s.forEach(x=>seen.add(x));if(c2s.length>1&&c2!=='mc')continue;if(slotKind(Q,c2s)!==k1)continue;
         if(qd.some(x=>!c2s.includes(x)))continue; /* ל־Q יש עוד משמרת באותו יום: לא מחליפים */
+        if(spanOverlap(c1,c2s))continue; /* אותן שעות (למשל לילה אגף א ⇄ ערב כירורגיה): ההחלפה לא משחררת כלום */
         take(Q,d,c2s);try{const ctx=buildCtx();const e1=evalSlot(Q,c1,d,ctx);if(!e1.hard){commitSlot(ctx,Q,c1,d);const e2=evalSlot(P,c2s,d,ctx);if(!e2.hard&&sigOk(Q,d,c2s))out.push({Q,d2:d,c2,c2s,score:e1.score+e2.score,why:[...e1.why,...e2.why]})}}finally{give(Q,d,c2s)}}
       continue}
     for(let d2=1;d2<=N;d2++){if(d2===d||cellOf(P,d2).c.length||cellOf(P,d2).mk==='vac')continue;const qc=cellOf(Q,d2).c;
