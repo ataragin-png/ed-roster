@@ -1802,7 +1802,7 @@ function preflight(action){return new Promise(res=>{const{A,L}=preflightList();i
    <div class="foot"><button class="btn danger" id="pfGo">${esc(action)} בכל זאת</button><button class="btn primary" data-close>חזרה לתיקון</button></div>`,()=>res(false));
   sh.el.querySelector('#pfGo').onclick=()=>{res(true);sh.close()}})}
 let pubBusy=false;
-async function publishCalendar(){
+async function publishCalendar(notify){
   if(!apiOn()){calSheet();return}
   if(!M().final&&!confirm('הלוח עוד לא אושר סופית. לפרסם בכל זאת?'))return;
   if(!(await preflight('פרסום')))return;
@@ -1815,7 +1815,12 @@ async function publishCalendar(){
     const{code,lim}=calWithSwaps(res);el.textContent='שולח לשרת…';
     const r=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'publish',key:S.settings.apiKey,m:S.cur,cal:code})});const j=await r.json();
     if(!j.ok)throw new Error(j.error==='key'?'המפתח לא תואם לשרת':String(j.error||'שגיאה'));M().publishedAt=Date.now();save();render();
-    toast(lim<0?'הלוח פורסם, בלי אפשרויות החלפה (גדול מדי)':`הלוח פורסם, כולל אפשרויות החלפה${lim<12?` (עד ${lim} לכל משמרת)`:''}. המתמחים יראו אותו ב"הלוח שלי" וב"עם מי להחליף"`,5000)}
+    toast(lim<0?'הלוח פורסם, בלי אפשרויות החלפה (גדול מדי)':`הלוח פורסם, כולל אפשרויות החלפה${lim<12?` (עד ${lim} לכל משמרת)`:''}. המתמחים יראו אותו ב"הלוח שלי" וב"עם מי להחליף"`,5000)
+    if(notify&&confirm(`לשלוח עכשיו לכל המתמחים של ${HEB_MONTHS[+key.slice(5)-1]} ${key.slice(0,4)} מייל עם קישור ללוח, ושיש להם 24 שעות להערות (אחר כך כל שינוי רק ראש בראש)?`)){
+      try{const r2=await fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'notifyPublish',key:S.settings.apiKey,m:key})});const j2=await r2.json();
+        toast(j2.ok?`נשלח מייל ל-${j2.sent} מתמחים. הערות עד ${j2.deadline}`+(j2.noMail&&j2.noMail.length?` · אין מייל ל: ${j2.noMail.join(', ')}`:''):'שליחת המיילים נכשלה: '+(j2.error||''),8000)}
+      catch(e2){toast('שליחת המיילים נכשלה: '+e2.message,5000)}}
+  }
   catch(e){toast('הפרסום נכשל: '+e.message,4500)}
   finally{pubBusy=false;el.remove();const b2=document.getElementById('bPub');if(b2)b2.disabled=false}
 }
@@ -2015,7 +2020,7 @@ $('#main').addEventListener('click',e=>{
   if(b.id==='bAddP'){const id=uid();S.people.push({id,name:'מתמחה חדש'});M().roster[id]=blankRoster('A','אגף א','',Object.keys(M().roster).length+1);save();renderPeople();const inp=document.querySelector(`tr[data-pid="${id}"] input[data-f="name"]`);inp&&(inp.focus(),inp.select());return}
   if(b.id==='bCopy'){copyLuach();return}
   if(b.id==='bCal'){calSheet();return}
-  if(b.id==='bPub'){publishCalendar();return}
+  if(b.id==='bPub'){publishCalendar(true);return}
   if(b.id==='bDept'){if(!confirm(`לשלוח לכל הגורמים (טיפול נמרץ, ילדים, מד״א, אורתופדיה, פנימית) את שיבוצי המתמחים בתחום שלהם ב${HEB_MONTHS[+S.cur.slice(5)-1]} ${S.cur.slice(0,4)}?`))return;b.disabled=true;
     fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'sendDeptSchedules',key:S.settings.apiKey,m:S.cur})}).then(r=>r.json()).then(j=>toast(j.ok?`נשלח: ${(j.sent||[]).join(', ')||'אין שיבוצים בתחומים האלה'}`:'השליחה נכשלה: '+(j.error||''),6000)).catch(e=>toast('השליחה נכשלה: '+e.message,5000)).finally(()=>{b.disabled=false});return}
   if(b.id==='bBoard'){exportBoard(false);return}
