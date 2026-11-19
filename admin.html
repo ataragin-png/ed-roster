@@ -213,7 +213,7 @@ table.form td.okc{color:var(--ok);font-weight:600}
 <header class="top">
   <div class="brand">
     <h1>שיבוץ מתמחים ברפואה דחופה</h1>
-    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 85</p>
+    <p id="subtitle"></p><p id="sync" style="margin:2px 0 0;color:var(--muted);font-size:12px">5.11.2026 גרסה 86</p>
   </div>
   <div class="monthnav">
     <label for="monthSel" class="hidden">חודש</label>
@@ -347,7 +347,7 @@ if(!S.locInit){S.locInit=1;for(const t of S.types)if(t.loc===undefined)t.loc=DEF
 if(!S.sigInit){S.sigInit=1;for(const t of S.types)if(t.signer===undefined)t.signer=['n','v','bv','p'].includes(t.code);for(const p of S.people)if(p.signer===undefined)p.signer=['דוד','אשר','טבקמן','יוני י','דנה','אוריה','אברהם','יוסי','באסל'].includes(p.name.trim());try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}scheduleSync()}
 let syncTimer=null,syncMsg='';
-const BUILD='5.11.2026 גרסה 85';
+const BUILD='5.11.2026 גרסה 86';
 function setSync(t){syncMsg=t;const el=document.getElementById('sync');if(el){el.textContent=t+(t?' · ':'')+BUILD;el.style.color=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'var(--danger)':'var(--muted)';el.style.fontWeight=/נכשל|אין חיבור|צריך לעדכן/.test(t)?'700':'400'}}
 function scheduleSync(){if(!(S.settings&&S.settings.apiUrl&&S.settings.apiKey))return;clearTimeout(syncTimer);setSync('שומר בגיליון…');syncTimer=setTimeout(pushState,2500)}
 function monthTab(key){
@@ -1094,7 +1094,7 @@ function statsPanel(){
 function renderLuach(){
   const N=dim(); const cols=S.types.filter(t=>{for(let d=1;d<=N;d++)if(need(t.code,d)||filled(t.code,d).length)return true;return false});
   let h0=statsPanel();
-  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}${apiOn()&&S.settings.boardUrl?`<button class="btn small" id="bBoard">ייצא ללוח התורנויות (Google Sheets)</button><button class="btn small" id="bBoardIn">משוך שינויים מלוח התורנויות</button>${M().exportedAt?`<span style="color:var(--muted);font-size:13px">יוצא ${new Date(M().exportedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:''}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
+  let h=`<div class="status">${apiOn()?`<button class="btn small primary" id="bPub">פרסם את הלוח למתמחים</button><button class="btn small" id="bDept" title="שולח לכל גורם (טיפול נמרץ, ילדים, מד״א, אורתופדיה, פנימית) את שיבוצי המתמחים בתחום שלו בחודש הזה">שלח שיבוצים לגורמים</button>${M().publishedAt?`<span style="color:var(--muted);font-size:13px">פורסם ${new Date(M().publishedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:`<button class="btn small primary" id="bCal">שלח למתמחים להוספה ליומן</button>`}${apiOn()&&S.settings.boardUrl?`<button class="btn small" id="bBoard">ייצא ללוח התורנויות (Google Sheets)</button><button class="btn small" id="bBoardIn">משוך שינויים מלוח התורנויות</button>${M().exportedAt?`<span style="color:var(--muted);font-size:13px">יוצא ${new Date(M().exportedAt).toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})}</span>`:''}`:''}<button class="btn small" id="bCopy">העתק כטבלה</button><span style="color:var(--muted);font-size:13px">מדביקים ישירות לאקסל או לוואטסאפ</span></div><div class="gridwrap" style="max-height:none"><table class="luach"><thead><tr><th>תאריך</th><th>יום</th>${cols.map(t=>`<th>${esc(t.name)}</th>`).join('')}<th>חותם שחרור בלילה</th></tr></thead><tbody>`;
   for(let d=1;d<=N;d++){
     h+=`<tr class="${dayClass(d)}"><td class="num">${d}</td><td>${WD[wd(d)]}${dtype(d)&&holName(S.cur,d)?' ('+holName(S.cur,d)+')':dtype(d)==='hol'?' (חג)':dtype(d)==='eve'?' (ערב חג)':''}</td>`;
     for(const t of cols){const f=filled(t.code,d), n=need(t.code,d);h+=f.length?`<td>${esc(f.map(pname).join(', '))}</td>`:n?`<td class="miss">חסר</td>`:`<td></td>`}
@@ -2016,6 +2016,8 @@ $('#main').addEventListener('click',e=>{
   if(b.id==='bCopy'){copyLuach();return}
   if(b.id==='bCal'){calSheet();return}
   if(b.id==='bPub'){publishCalendar();return}
+  if(b.id==='bDept'){if(!confirm(`לשלוח לכל הגורמים (טיפול נמרץ, ילדים, מד״א, אורתופדיה, פנימית) את שיבוצי המתמחים בתחום שלהם ב${HEB_MONTHS[+S.cur.slice(5)-1]} ${S.cur.slice(0,4)}?`))return;b.disabled=true;
+    fetch(S.settings.apiUrl,{method:'POST',body:JSON.stringify({action:'sendDeptSchedules',key:S.settings.apiKey,m:S.cur})}).then(r=>r.json()).then(j=>toast(j.ok?`נשלח: ${(j.sent||[]).join(', ')||'אין שיבוצים בתחומים האלה'}`:'השליחה נכשלה: '+(j.error||''),6000)).catch(e=>toast('השליחה נכשלה: '+e.message,5000)).finally(()=>{b.disabled=false});return}
   if(b.id==='bBoard'){exportBoard(false);return}
   if(b.id==='bBoardIn'){importBoard(true);return}
   if(b.dataset.tdel!==undefined){const t=S.types[+b.dataset.tdel];if(!confirm(`למחוק את "${t.name}"? שיבוצים קיימים בקוד ${t.code} יסומנו כקוד לא מוכר.`))return;S.types.splice(+b.dataset.tdel,1);save();renderSettings();return}
