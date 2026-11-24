@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>בקשות משמרות – בכירים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="core.css">
+<style>
+header.top,.wrap{max-width:640px}
+.modes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.modes .btn{min-height:34px}
+.modes .btn.b[aria-pressed="true"]{background:var(--danger);border-color:var(--danger);color:#fff}
+.modes .btn.s[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+.modes .btn.w[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.cal .d{cursor:pointer}
+.cal .d:hover{border-color:var(--primary)}
+.cal .d.vstart{box-shadow:inset 0 0 0 2px var(--primary)}
+.areas{display:flex;flex-wrap:wrap;gap:6px}
+.areas label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--surface);cursor:pointer}
+.areas input{margin:0}
+.sumline{margin:4px 0;font-size:13px}
+.myshift{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line2)}
+.myshift .dt{min-width:84px;font-weight:700}
+.boardwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius-m);background:var(--surface)}
+table.board{border-collapse:collapse;font-size:12px}
+table.board th,table.board td{border:1px solid var(--line2);padding:3px 6px;white-space:nowrap;text-align:center}
+table.board thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+table.board td.dcol{position:sticky;right:0;background:var(--surface);font-weight:700;text-align:right}
+table.board tr.wk td{background:var(--wk)}table.board tr.hol td{background:var(--hol)}
+table.board td.me{background:var(--primary);color:var(--primary-ink);font-weight:700}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><h1>בקשות משמרות</h1><p>רפואה דחופה · רופאים בכירים</p></div>
+</header>
+<div class="wrap">
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="req" aria-selected="true">בקשה לחודש</button>
+    <button role="tab" data-tab="mine" aria-selected="false">הלוח שלי</button>
+  </nav>
+  <main id="main"></main>
+</div>
+<div id="layer"></div>
+<script src="core.js"></script>
+<script>
+const API = getApi();
+const DKEY = 'sr-request-draft-v1';
+let CFG = lsGet('sr-config', { names: [], slots: DEFAULT_SLOTS, deadlines: {} });
+let TAB = 'req', MODE = 'b', PART = '', VSTART = null;
+function blank() { return { m: monthOpts()[1], n: '', b: {}, s: {}, w: {}, vac: [], want: '', areas: [], t: '' }; }
+let RQ = lsGet(DKEY, null);
+if (!RQ || !monthOpts().includes(RQ.m)) RQ = { ...blank(), n: RQ?.n || '' };
+const saveDraft = () => lsSet(DKEY, RQ);
+
+function deadline() { const d = CFG.deadlines?.[RQ.m]; return d ? new Date(d) : null; }
+function fmtDl(dt) { return `${dt.getDate()}.${dt.getMonth() + 1} בשעה ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`; }
+
+function render() {
+  $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === TAB));
+  if (TAB === 'req') renderReq(); else renderMine();
+}
+
+function renderReq() {
+  const key = RQ.m, dim = kDim(key), first = kWd(key, 1), H = hol(key), dl = deadline();
+  const late = dl && Date.now() > dl.getTime();
+  const names = CFG.names || [];
+  let cells = WD.map(w => `<div class="wd">${w}</div>`).join('');
+  for (let i = 0; i < first; i++) cells += `<div class="d empty"></div>`;
+  for (let d = 1; d <= dim; d++) {
+    const tags = [];
+    if (inVac(RQ.vac, d)) tags.push(`<span class="tag v">חופשה</span>`);
+    if (d in RQ.b) tags.push(`<span class="tag b">לא יכול${RQ.b[d] ? ' ' + PARTS[RQ.b[d]] : ''}</span>`);
+    if (d in RQ.s) tags.push(`<span class="tag s">עדיף שלא${RQ.s[d] ? ' ' + PARTS[RQ.s[d]] : ''}</span>`);
+    if (d in RQ.w) tags.push(`<span class="tag w">רוצה${RQ.w[d] ? ' ' + PARTS[RQ.w[d]] : ''}</span>`);
+    cells += `<button type="button" class="d ${dayClass(key, d)}${VSTART === d ? ' vstart' : ''}" data-d="${d}" aria-label="${d} ${kLabel(key)}"><span class="n num">${d}</span>${H[d] ? `<span class="hn">${esc(H[d].name)}</span>` : ''}${tags.join('')}</button>`;
+  }
+  const nB = Object.keys(RQ.b).length, nS = Object.keys(RQ.s).length, nW = Object.keys(RQ.w).length;
+  const vDays = (RQ.vac || []).reduce((a, [x, y]) => a + (y - x + 1), 0);
+  $('#main').innerHTML = `
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:180px"><label class="f" for="nm">שם</label>
+        ${names.length ? `<select id="nm" style="width:100%"><option value="">בחרו שם…</option>${names.map(n => `<option ${n === RQ.n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`
+          : `<input type="text" id="nm" style="width:100%" value="${esc(RQ.n)}" placeholder="שם מלא">`}</div>
+      <div><label class="f" for="mo">חודש</label><select id="mo">${monthOpts().map(k => `<option value="${k}" ${k === RQ.m ? 'selected' : ''}>${kLabel(k)}</option>`).join('')}</select></div>
+    </div>
+    ${dl ? `<p class="sumline ${late ? '' : 'muted'}">${late ? '<span class="pill bad">ההגשה לחודש הזה נסגרה</span>' : `מועד אחרון להגשה: ${fmtDl(dl)}`}</p>` : ''}
+  </div>
+  <div class="card">
+    <h2>סמנו ימים בלוח</h2>
+    <p class="sub">בחרו סוג, ואז לחצו על ימים. לחיצה נוספת מבטלת. לחופשה לוחצים על היום הראשון ואז על האחרון.</p>
+    <div class="modes" role="group" aria-label="סוג סימון">
+      <button class="btn b" data-mode="b" aria-pressed="${MODE === 'b'}">לא יכול</button>
+      <button class="btn s" data-mode="s" aria-pressed="${MODE === 's'}">עדיף שלא</button>
+      <button class="btn w" data-mode="w" aria-pressed="${MODE === 'w'}">רוצה לעבוד</button>
+      <button class="btn" data-mode="v" aria-pressed="${MODE === 'v'}">חופשה</button>
+      <button class="btn" data-mode="x" aria-pressed="${MODE === 'x'}">ניקוי</button>
+    </div>
+    ${'bsw'.includes(MODE) ? `<div class="seg" role="group" aria-label="חלק מהיום" style="margin-bottom:10px">${Object.entries(PARTS).map(([k, v]) => `<button data-part="${k}" aria-pressed="${PART === k}">${v}${k === 'm' ? ' (עד 16)' : k === 'e' ? ' (16–24)' : ''}</button>`).join('')}</div>` : ''}
+    ${MODE === 'v' && VSTART ? `<div class="warnbox" style="margin-bottom:8px">תחילת החופשה: ${VSTART}. לחצו על היום האחרון.</div>` : ''}
+    <div class="cal">${cells}</div>
+    <div class="legend"><span><i class="sw" style="background:var(--wk)"></i>סופ״ש</span><span><i class="sw" style="background:var(--hol)"></i>חג</span><span><i class="sw" style="background:var(--eve)"></i>ערב חג</span></div>
+  </div>
+  <div class="card">
+    <h2>העדפות כלליות</h2>
+    <label class="f" for="want">כמה משמרות תרצו החודש? (לא חובה)</label>
+    <input type="number" id="want" min="0" max="31" inputmode="numeric" value="${esc(RQ.want)}" style="width:110px">
+    <label class="f">אזורים מועדפים (לא חובה)</label>
+    <div class="areas">${Object.entries(AREAS).map(([k, v]) => `<label><input type="checkbox" data-area="${k}" ${RQ.areas.includes(k) ? 'checked' : ''}>${v}</label>`).join('')}</div>
+    <label class="f" for="note">הערות</label>
+    <textarea id="note" placeholder="למשל: מעדיף ערבים, אירוע משפחתי, החלפה מתוכננת…">${esc(RQ.t)}</textarea>
+  </div>
+  <div class="card">
+    <p class="sumline">לא יכול: <b class="num">${nB}</b> · עדיף שלא: <b class="num">${nS}</b> · רוצה: <b class="num">${nW}</b> · ימי חופשה: <b class="num">${vDays}</b></p>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="send" ${late ? 'disabled' : ''}>שליחת הבקשה</button>
+      <button class="btn" id="reset">ניקוי הכול</button>
+    </div>
+  </div>`;
+  const nm = $('#nm'); nm.onchange = nm.oninput = () => { RQ.n = norm(nm.value); saveDraft(); };
+  $('#mo').onchange = e => { RQ = { ...blank(), n: RQ.n, m: e.target.value, want: RQ.want, areas: RQ.areas }; VSTART = null; saveDraft(); render(); };
+  $$('[data-mode]').forEach(b => b.onclick = () => { MODE = b.dataset.mode; VSTART = null; render(); });
+  $$('[data-part]').forEach(b => b.onclick = () => { PART = b.dataset.part; render(); });
+  $$('.cal .d[data-d]').forEach(b => b.onclick = () => tapDay(Number(b.dataset.d)));
+  $('#want').oninput = e => { RQ.want = e.target.value; saveDraft(); };
+  $$('[data-area]').forEach(c => c.onchange = () => { RQ.areas = $$('[data-area]').filter(x => x.checked).map(x => x.dataset.area); saveDraft(); });
+  $('#note').oninput = e => { RQ.t = e.target.value; saveDraft(); };
+  $('#send').onclick = confirmSend;
+  $('#reset').onclick = () => { if (confirm('לנקות את כל הסימונים לחודש הזה?')) { RQ = { ...blank(), n: RQ.n, m: RQ.m }; saveDraft(); render(); } };
+}
+
+function tapDay(d) {
+  if (MODE === 'x') { delete RQ.b[d]; delete RQ.s[d]; delete RQ.w[d]; RQ.vac = RQ.vac.filter(([a, b]) => d < a || d > b); }
+  else if (MODE === 'v') {
+    const hit = RQ.vac.findIndex(([a, b]) => d >= a && d <= b);
+    if (hit >= 0 && VSTART === null) RQ.vac.splice(hit, 1);
+    else if (VSTART === null) { VSTART = d; render(); return; }
+    else { const a = Math.min(VSTART, d), b = Math.max(VSTART, d); RQ.vac = RQ.vac.filter(([x, y]) => y < a || x > b); RQ.vac.push([a, b]); RQ.vac.sort((x, y) => x[0] - y[0]); VSTART = null; }
+  } else {
+    const M = RQ[MODE];
+    if (d in M && M[d] === PART) delete M[d];
+    else { delete RQ.b[d]; delete RQ.s[d]; delete RQ.w[d]; M[d] = PART; }
+  }
+  saveDraft(); render();
+}
+
+function summaryText() {
+  const fmt = o => Object.keys(o).map(Number).sort((a, b) => a - b).map(d => d + (o[d] ? ` (${PARTS[o[d]]})` : '')).join(', ');
+  const L = [`בקשת משמרות – ${RQ.n} – ${kLabel(RQ.m)}`];
+  if (Object.keys(RQ.b).length) L.push('לא יכול: ' + fmt(RQ.b));
+  if (Object.keys(RQ.s).length) L.push('עדיף שלא: ' + fmt(RQ.s));
+  if (Object.keys(RQ.w).length) L.push('רוצה לעבוד: ' + fmt(RQ.w));
+  if (RQ.vac.length) L.push('חופשה: ' + RQ.vac.map(([a, b]) => a === b ? a : `${a}–${b}`).join(', '));
+  if (RQ.want) L.push('מספר משמרות רצוי: ' + RQ.want);
+  if (RQ.areas.length) L.push('אזורים מועדפים: ' + RQ.areas.map(a => AREAS[a]).join(', '));
+  if (norm(RQ.t)) L.push('הערות: ' + norm(RQ.t));
+  return L.join('\n');
+}
+
+function confirmSend() {
+  if (!RQ.n) { toast('בחרו שם'); $('#nm').focus(); return; }
+  const txt = summaryText();
+  const sh = openSheet(`<h3>לשלוח את הבקשה?</h3><p class="sub">זה מה שיגיע לסייאד:</p><pre style="white-space:pre-wrap;background:var(--surface2);padding:10px;border-radius:8px;margin:0">${esc(txt)}</pre><div class="foot"><button class="btn primary" id="go">שליחה</button><button class="btn" data-close>חזרה</button></div>`);
+  sh.el.querySelector('#go').onclick = () => { sh.close(); send(txt); };
+}
+
+async function send(txt) {
+  const q = { type: 'req', m: RQ.m, n: RQ.n, b: RQ.b, s: RQ.s, w: RQ.w, vac: RQ.vac, want: RQ.want === '' ? '' : Number(RQ.want), areas: RQ.areas, t: norm(RQ.t), ts: Date.now() };
+  if (!API) { const sh = openSheet(`<h3>ההודעה מוכנה</h3><p class="sub">האתר עוד לא מחובר לשרת. העתיקו ושלחו לסייאד.</p><textarea readonly style="min-height:160px">${esc(txt)}</textarea><div class="foot"><button class="btn primary" id="cp">העתקה</button><button class="btn" data-close>סגירה</button></div>`); sh.el.querySelector('#cp').onclick = () => copyText(txt); return; }
+  const sh = openSheet(`<h3>שולח…</h3><p class="sub">רגע אחד.</p>`);
+  try {
+    const j = await apiPost(API, { action: 'submit', q });
+    if (!j.ok) { if (j.error === 'closed') { sh.el.innerHTML = `<h3>ההגשה נסגרה</h3><p class="sub">המועד האחרון להגשת בקשות לחודש הזה עבר. פנו לסייאד ישירות.</p><div class="foot"><button class="btn primary" data-close>סגירה</button></div>`; return; } throw new Error(j.error); }
+    sh.el.innerHTML = `<h3>נשלח ✓</h3><div class="done">הבקשה הגיעה לסייאד. אם תשנו משהו, שלחו שוב. הבקשה האחרונה היא שקובעת.</div><div class="foot"><button class="btn primary" data-close>סגירה</button></div>`;
+  } catch (e) { sh.el.innerHTML = `<h3>השליחה נכשלה</h3><p class="sub">בדקו את החיבור לאינטרנט ונסו שוב.</p><div class="foot"><button class="btn primary" data-close>סגירה</button></div>`; }
+}
+
+/* ---- הלוח שלי ---- */
+let CAL = null, CALM = null, MONTHS = [], FULL = false;
+async function loadCal(m) {
+  if (!API) return;
+  try { const j = await apiGet(API, { action: 'calendar', ...(m ? { m } : {}) }); if (j.ok) { MONTHS = j.months || []; CALM = j.m; CAL = j.cal ? JSON.parse(j.cal) : null; } } catch (e) { CAL = null; }
+}
+async function renderMine() {
+  const main = $('#main');
+  if (!API) { main.innerHTML = `<div class="card">האתר עוד לא מחובר לשרת.</div>`; return; }
+  if (CAL === null && CALM === null) { main.innerHTML = `<div class="card muted">טוען את הלוח…</div>`; await loadCal(); if (TAB !== 'mine') return; }
+  if (!CAL) { main.innerHTML = `<div class="card">עוד לא פורסם לוח.</div>`; return; }
+  const key = CAL.m, slots = CAL.slots || DEFAULT_SLOTS, G = CAL.grid || {};
+  const names = [...new Set([...(CFG.names || []), ...Object.values(G)])].sort((a, b) => a.localeCompare(b, 'he'));
+  const me = RQ.n;
+  const mine = [];
+  for (let d = 1; d <= kDim(key); d++) for (const s of slots) if (G[d + '|' + s.id] === me) mine.push({ d, s });
+  let board = '';
+  if (FULL) {
+    board = `<div class="boardwrap" style="margin-top:10px"><table class="board"><thead><tr><th>יום</th>${slots.map(s => `<th><span class="chip a-${s.area}">${esc(slotShort(s))}</span></th>`).join('')}</tr></thead><tbody>`;
+    for (let d = 1; d <= kDim(key); d++) board += `<tr class="${dayClass(key, d)}"><td class="dcol num">${d} ${WD[kWd(key, d)]}׳</td>${slots.map(s => { const n = G[d + '|' + s.id] || ''; return `<td class="${n && n === me ? 'me' : ''}">${esc(n)}</td>`; }).join('')}</tr>`;
+    board += `</tbody></table></div>`;
+  }
+  main.innerHTML = `<div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:160px"><label class="f" for="mnm">שם</label><select id="mnm" style="width:100%"><option value="">בחרו שם…</option>${names.map(n => `<option ${n === me ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+      <div><label class="f" for="mmo">חודש</label><select id="mmo">${MONTHS.map(k => `<option value="${k}" ${k === key ? 'selected' : ''}>${kLabel(k)}</option>`).join('')}</select></div>
+    </div>
+    ${CAL.at ? `<p class="sumline muted">עודכן ${new Date(CAL.at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}</p>` : ''}
+  </div>
+  <div class="card"><h2>${me ? `המשמרות של ${esc(me)} ב${kLabel(key)}` : 'בחרו שם'}</h2>
+    ${me ? (mine.length ? mine.map(({ d, s }) => `<div class="myshift"><span class="dt num">${d}.${Number(key.slice(5))} · ${WD[kWd(key, d)]}׳</span><span class="chip a-${s.area}">${esc(slotName(s))}</span><span class="num">${slotTime(s)}</span></div>`).join('') + `<p class="sumline muted" style="margin-top:8px">סה״כ ${mine.length} משמרות</p>` : '<p class="muted">אין משמרות בחודש הזה.</p>') : ''}
+    <div class="row" style="margin-top:10px"><button class="btn" id="full">${FULL ? 'הסתרת הלוח המלא' : 'הצגת הלוח המלא'}</button></div>
+    ${board}
+  </div>`;
+  $('#mnm').onchange = e => { RQ.n = e.target.value; saveDraft(); renderMine(); };
+  $('#mmo').onchange = async e => { await loadCal(e.target.value); renderMine(); };
+  $('#full').onclick = () => { FULL = !FULL; renderMine(); };
+}
+
+$$('nav.tabs button').forEach(b => b.onclick = () => { TAB = b.dataset.tab; render(); });
+render();
+if (API) apiGet(API, { action: 'config' }).then(j => { if (j.ok && j.config) { CFG = { ...CFG, ...j.config, slots: j.config.slots?.length ? j.config.slots : DEFAULT_SLOTS }; lsSet('sr-config', CFG); if (TAB === 'req') render(); } }).catch(() => {});
+</script>
+</body>
+</html>
