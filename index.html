@@ -274,7 +274,8 @@ function checkBlocks(key,g,b){const ru=rulesFor(g),wk=b.filter(d=>kWeekend(key,d
 function toast(msg,ms=2800){const el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),ms)}
 
 const DKEY='ed-request-draft-v1';
-function blank(){return{m:monthOpts()[1],name:'',g:'A',rot:'',b:[],s:[],w:[],vac:[],vby:'איתי',vre:'חופשה',t:'',mode:'b',wcode:''}}
+function defMonth(){const o=monthOpts();try{return o.slice(1).find(m=>!closed(m))||o[1]}catch(e){return o[1]}}
+function blank(){return{m:defMonth(),name:'',g:'A',rot:'',b:[],s:[],w:[],vac:[],vby:'איתי',vre:'חופשה',t:'',mode:'b',wcode:''}}
 let RQ;try{RQ=JSON.parse(localStorage.getItem(DKEY)||'null')}catch(e){RQ=null}
 if(!RQ||!monthOpts().includes(RQ.m))RQ={...blank(),...(RQ?{name:RQ.name,g:RQ.g,rot:RQ.rot}:{})};
 RQ.b=new Map((RQ.b||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.bpart)RQ.bpart='';if(!RQ.rbpart)RQ.rbpart='';RQ.s=new Map((RQ.s||[]).map(x=>Array.isArray(x)?x:[x,'']));if(!RQ.spart)RQ.spart='';RQ.w=new Map(RQ.w);RQ.vac=new Set(RQ.vac||[]);if(RQ.vby===undefined)RQ.vby='איתי';if(!RQ.vre)RQ.vre='חופשה';
@@ -379,7 +380,7 @@ const LATE_NAME='אשר';
 function adminKey(){try{return(JSON.parse(localStorage.getItem('ed-roster-v1')||'{}').settings||{}).apiKey||''}catch(e){return''}}
 function lateOk(){return typeof RQ!=='undefined'&&RQ&&norm(RQ.name)===LATE_NAME&&!!adminKey()}
 function dlText(m){const d=dl(m);return d?d.toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''}
-async function fetchPlan(){if(!API)return;try{const r=await fetch(API+'?action=plan');const j=await r.json();if(j.ok&&j.deadlines){DEADLINES={...DEADLINES,...j.deadlines};localStorage.setItem('ed-deadlines',JSON.stringify(DEADLINES))}if(j.ok&&j.plan){PLAN=j.plan;localStorage.setItem('ed-plan-v1',JSON.stringify(PLAN));const had=planFor(RQ.name,RQ.m);if(had)autoGroup();render()}}catch(e){}}
+async function fetchPlan(){if(!API)return;try{const r=await fetch(API+'?action=plan');const j=await r.json();if(j.ok&&j.deadlines){DEADLINES={...DEADLINES,...j.deadlines};localStorage.setItem('ed-deadlines',JSON.stringify(DEADLINES));if(RQ&&closed(RQ.m)&&!RQ.b.size&&!RQ.s.size&&!RQ.w.size&&!RQ.vac.size){const nm=defMonth();if(nm!==RQ.m){RQ.m=nm;persist();render()}}}if(j.ok&&j.plan){PLAN=j.plan;localStorage.setItem('ed-plan-v1',JSON.stringify(PLAN));const had=planFor(RQ.name,RQ.m);if(had)autoGroup();render()}}catch(e){}}
 function planRow(name){if(!PLAN)return null;const c=x=>norm(x).replace(/["'׳״`]/g,'');const n=c(name);if(!n)return null;const k=Object.keys(PLAN).find(x=>c(x)===n);return k?PLAN[k]:null}
 function planFor(name,m){const r=planRow(name);return r?r[m]||'':''}
 function planGroup(l){if(!l)return null;if(/מלר.?ד|אגף\s*א/.test(l)&&!/ב\s*\+\s*ג/.test(l))return'A';if(/מילואים/.test(l))return'M';if(/שלב\s*[אב]|לא\s*פעיל|חל.?ד|חופשת\s*לידה|סטאז|^חופש$/.test(l))return'X';return'R'}
